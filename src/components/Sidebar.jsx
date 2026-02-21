@@ -16,22 +16,33 @@ import {
   User,
 } from "lucide-react";
 
-export default function Sidebar() {
+export default function Sidebar({ onExpandChange }) {
   const [expanded, setExpanded] = React.useState(false);
 
   const [openManage, setOpenManage] = React.useState(true);
   const [openOrders, setOpenOrders] = React.useState(true);
   const [openAssign, setOpenAssign] = React.useState(true);
 
+  const handleEnter = () => {
+    setExpanded(true);
+    onExpandChange?.(true);
+  };
+
+  const handleLeave = () => {
+    setExpanded(false);
+    onExpandChange?.(false);
+  };
+
   return (
     <aside
-      onMouseEnter={() => setExpanded(true)}
-      onMouseLeave={() => setExpanded(false)}
-      className={`h-screen bg-white border-r font-main flex flex-col
-      transition-all duration-300 ease-in-out
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
+      className={`fixed left-0 top-0 z-50 h-screen bg-white border-r font-main flex flex-col
+      overflow-y-auto transition-all duration-300 ease-in-out
       ${expanded ? "w-72" : "w-20"}`}
     >
-      <div className="h-20  flex items-center justify-center">
+      {/* LOGO */}
+      <div className="h-20 flex items-center justify-center">
         <div className="font-logo text-[#E8712E] tracking-wide">
           {expanded ? (
             <span className="text-4xl">BOOKFET</span>
@@ -62,36 +73,15 @@ export default function Sidebar() {
           open={openManage}
           onToggle={() => setOpenManage((v) => !v)}
         >
+          <SubItem icon={<BookOpen className="h-4 w-4" />} label="Menu" />
+          <SubItem icon={<Soup className="h-4 w-4" />} label="Món ăn" />
+          <SubItem icon={<Folder className="h-4 w-4" />} label="Danh mục" />
           <SubItem
-            expanded={expanded}
-            icon={<BookOpen className="h-4 w-4" />}
-            label="Menu"
-          />
-          <SubItem
-            expanded={expanded}
-            icon={<Soup className="h-4 w-4" />}
-            label="Món ăn"
-          />
-          <SubItem
-            expanded={expanded}
-            icon={<Folder className="h-4 w-4" />}
-            label="Danh mục"
-          />
-          <SubItem
-            expanded={expanded}
             icon={<ConciergeBell className="h-4 w-4" />}
             label="Dịch vụ"
           />
-          <SubItem
-            expanded={expanded}
-            icon={<Gift className="h-4 w-4" />}
-            label="Tiệc"
-          />
-          <SubItem
-            expanded={expanded}
-            icon={<Warehouse className="h-4 w-4" />}
-            label="Kho"
-          />
+          <SubItem icon={<Gift className="h-4 w-4" />} label="Tiệc" />
+          <SubItem icon={<Warehouse className="h-4 w-4" />} label="Kho" />
         </Dropdown>
 
         {/* Đơn hàng */}
@@ -103,15 +93,10 @@ export default function Sidebar() {
           onToggle={() => setOpenOrders((v) => !v)}
         >
           <SubItem
-            expanded={expanded}
             icon={<ClipboardList className="h-4 w-4" />}
             label="Quản lí đơn hàng"
           />
-          <SubItem
-            expanded={expanded}
-            icon={<Search className="h-4 w-4" />}
-            label="Tra cứu"
-          />
+          <SubItem icon={<Search className="h-4 w-4" />} label="Tra cứu" />
         </Dropdown>
 
         {/* Phân công */}
@@ -122,19 +107,14 @@ export default function Sidebar() {
           open={openAssign}
           onToggle={() => setOpenAssign((v) => !v)}
         >
+          <SubItem icon={<Users className="h-4 w-4" />} label="Nhân viên" />
           <SubItem
-            expanded={expanded}
-            icon={<Users className="h-4 w-4" />}
-            label="Nhân viên"
-          />
-          <SubItem
-            expanded={expanded}
             icon={<CalendarDays className="h-4 w-4" />}
             label="Lịch trình"
           />
         </Dropdown>
 
-        {/* Divider + Cài đặt */}
+        {/* Cài đặt */}
         {expanded && (
           <>
             <div className="my-6 border-t" />
@@ -152,6 +132,8 @@ export default function Sidebar() {
   );
 }
 
+/* ---------- COMPONENTS ---------- */
+
 function SectionTitle({ children }) {
   return (
     <div className="mt-5 mb-2 px-2 text-xs font-semibold tracking-widest text-gray-400">
@@ -165,7 +147,7 @@ function NavItem({ icon, label, active, expanded }) {
     <button
       type="button"
       className={`w-full flex items-center ${
-        expanded ? "gap-3 px-4" : "justify-center px-0"
+        expanded ? "gap-3 px-4" : "justify-center"
       } py-3 rounded-xl text-sm transition
         ${
           active
@@ -174,7 +156,7 @@ function NavItem({ icon, label, active, expanded }) {
         }`}
       title={!expanded ? label : undefined}
     >
-      <span className={`${active ? "text-[#E8712E]" : "text-gray-500"}`}>
+      <span className={active ? "text-[#E8712E]" : "text-gray-500"}>
         {icon}
       </span>
       {expanded && <span>{label}</span>}
@@ -189,7 +171,7 @@ function Dropdown({ icon, label, open, onToggle, children, expanded }) {
         type="button"
         onClick={expanded ? onToggle : undefined}
         className={`w-full flex items-center ${
-          expanded ? "justify-between px-4" : "justify-center px-0"
+          expanded ? "justify-between px-4" : "justify-center"
         } py-3 rounded-xl text-sm hover:bg-gray-100 transition`}
         title={!expanded ? label : undefined}
       >
@@ -207,17 +189,17 @@ function Dropdown({ icon, label, open, onToggle, children, expanded }) {
         )}
       </button>
 
-      {open ? (
+      {open && (
         <div
           className={`mt-1 space-y-1 ${
-            expanded ? "ml-10" : "ml-0 flex flex-col items-center"
+            expanded ? "ml-10" : "flex flex-col items-center"
           }`}
         >
           {React.Children.map(children, (child) =>
             React.cloneElement(child, { expanded }),
           )}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

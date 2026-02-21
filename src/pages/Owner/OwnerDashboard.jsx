@@ -17,6 +17,7 @@ export default function OwnerDashboard() {
       title: "Chờ duyệt",
       value: 10,
       icon: <Package className="h-5 w-5" />,
+      color: "#19ACA0",
       badge: "+ 8.56%",
       badgeUp: true,
       active: false,
@@ -25,6 +26,7 @@ export default function OwnerDashboard() {
       title: "Hoàn thành",
       value: 567,
       icon: <CheckCircle2 className="h-5 w-5" />,
+      color: "#1F982A",
       badge: "+ 9.6%",
       badgeUp: true,
       active: true,
@@ -33,6 +35,7 @@ export default function OwnerDashboard() {
       title: "Doanh thu",
       value: "123,123,123",
       icon: <DollarSign className="h-5 w-5" />,
+      color: "#3B82F6", // nếu bạn có mã chuẩn, gửi mình đổi
       badge: "- 9.6%",
       badgeUp: false,
       active: false,
@@ -41,63 +44,43 @@ export default function OwnerDashboard() {
       title: "Đơn hủy",
       value: 125,
       icon: <XCircle className="h-5 w-5" />,
+      color: "#DE4444",
       badge: "+ 12.3%",
       badgeUp: true,
       active: false,
     },
   ];
 
-  const pendingOrders = [
-    {
-      id: "#4546563",
-      time: "26 tháng 3 2020, 12:42 Sáng",
-      customer: "Roberto Carlo",
-      location: "ĐH FPT HCM",
-      menu: "10.000.000 VNĐ",
-    },
-    {
-      id: "#4546563",
-      time: "26 tháng 3 2020, 12:42 Sáng",
-      customer: "Roberto Carlo",
-      location: "ĐH FPT HCM",
-      menu: "10.000.000 VNĐ",
-    },
-    {
-      id: "#4546563",
-      time: "26 tháng 3 2020, 12:42 Sáng",
-      customer: "Roberto Carlo",
-      location: "ĐH FPT HCM",
-      menu: "10.000.000 VNĐ",
-    },
-    {
-      id: "#4546563",
-      time: "26 tháng 3 2020, 12:42 Sáng",
-      customer: "Roberto Carlo",
-      location: "ĐH FPT HCM",
-      menu: "10.000.000 VNĐ",
-    },
-  ];
-
+  const pendingOrders = Array.from({ length: 6 }).map(() => ({
+    id: "#4546563",
+    time: "26 tháng 3 2020, 12:42 Sáng",
+    customer: "Roberto Carlo",
+    location: "ĐH FPT HCM",
+    menu: "10.000.000 VNĐ",
+  }));
+  const [sbExpanded, setSbExpanded] = React.useState(false);
   return (
-    <div className="flex min-h-screen bg-[#fbf7f2] font-main">
-      {/* LEFT SIDEBAR */}
-      <Sidebar />
+    <div className="min-h-screen bg-[#FFFAF0] font-main">
+      <Sidebar onExpandChange={setSbExpanded} />
 
-      {/* RIGHT CONTENT */}
-      <div className="flex-1">
+      <div
+        className={`min-h-screen transition-[margin] duration-300 ease-in-out ${
+          sbExpanded ? "ml-72" : "ml-20"
+        }`}
+      >
         {/* TOP BAR */}
-        <header className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b">
-          <div className="flex items-center justify-between px-6 py-4">
-            <h2 className="text-lg font-semibold tracking-wide text-gray-800">
+        <header className="sticky top-0 z-10 bg-white border-b">
+          <div className="h-16 px-7 flex items-center justify-between">
+            <h2 className="text-lg font-semibold tracking-wide text-[#1f2937]">
               TỔNG QUAN
             </h2>
 
             <div className="flex items-center gap-4">
               {/* Search */}
-              <div className="hidden md:flex items-center gap-2 bg-gray-50 border rounded-full px-4 py-2 w-[420px]">
+              <div className="hidden md:flex items-center gap-2 bg-[#F6F7FB] border border-[#EEF0F6] rounded-full px-4 py-2 w-[360px]">
                 <Search className="h-4 w-4 text-gray-400" />
                 <input
-                  className="bg-transparent outline-none text-sm w-full"
+                  className="bg-transparent outline-none text-sm w-full text-gray-700 placeholder:text-gray-400"
                   placeholder="Tìm"
                 />
               </div>
@@ -108,7 +91,7 @@ export default function OwnerDashboard() {
               </button>
               <button className="p-2 rounded-full hover:bg-gray-100 relative">
                 <Bell className="h-5 w-5 text-gray-600" />
-                <span className="absolute -top-0 -right-0 h-2 w-2 rounded-full bg-red-500" />
+                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500" />
               </button>
 
               {/* Avatar */}
@@ -126,31 +109,41 @@ export default function OwnerDashboard() {
           </div>
         </header>
 
-        {/* PAGE CONTENT */}
-        <main className="px-6 py-6">
-          {/* Filter Tabs (Hôm nay / Tháng này / Năm nay) */}
-          <div className="flex justify-end mb-5">
-            <div className="inline-flex bg-white border rounded-lg p-1 gap-1">
+        {/* CONTENT */}
+        <main className="px-7 py-6">
+          {/* Tabs */}
+          <div className="flex justify-end mb-6">
+            <div className="inline-flex bg-white rounded-lg p-1 gap-1 border border-[#F2B9A5]">
               <Tab label="Hôm nay" />
               <Tab label="Tháng này" active />
               <Tab label="Năm nay" />
             </div>
           </div>
 
-          {/* STAT CARDS */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {/* Stat cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
             {stats.map((s) => (
               <StatCard key={s.title} {...s} />
             ))}
           </div>
 
-          {/* REVENUE CHART */}
-          <section className="mt-6 bg-white rounded-xl border p-5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-800">Doanh thu</h3>
-              <div className="text-sm text-gray-500">
-                Tổng{" "}
-                <span className="font-semibold text-gray-800">41,512M</span>
+          {/* Revenue chart */}
+          <section className="mt-6 bg-white rounded-xl border border-[#F1F2F6] p-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Doanh thu
+                </h3>
+
+                <div className="mt-3 flex items-start gap-2 text-sm">
+                  <span className="mt-1 inline-block h-4 w-[3px] rounded bg-[#E8712E]" />
+                  <div className="text-gray-500 leading-tight">
+                    <div className="text-xs">Tổng</div>
+                    <div className="text-gray-900 font-semibold text-xs">
+                      41,512M
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -159,39 +152,39 @@ export default function OwnerDashboard() {
             </div>
           </section>
 
-          {/* PENDING ORDERS TABLE */}
+          {/* Pending orders */}
           <section className="mt-8">
             <h3 className="text-[#E8712E] font-bold mb-4">
               Đơn hàng chờ duyệt
             </h3>
 
-            <div className="bg-white rounded-xl border overflow-hidden">
+            <div className="bg-white rounded-xl border border-[#F1F2F6] overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-white">
-                    <tr className="text-left text-gray-500">
-                      <th className="px-5 py-4 font-medium">Order ID</th>
-                      <th className="px-5 py-4 font-medium">Thời gian</th>
-                      <th className="px-5 py-4 font-medium">Khách hàng</th>
-                      <th className="px-5 py-4 font-medium">Địa điểm</th>
-                      <th className="px-5 py-4 font-medium">Menu</th>
-                      <th className="px-5 py-4 font-medium">Chi tiết</th>
+                  <thead>
+                    <tr className="text-left text-gray-500 border-b border-[#F1F2F6]">
+                      <th className="px-6 py-4 font-medium">Order ID</th>
+                      <th className="px-6 py-4 font-medium">Thời gian</th>
+                      <th className="px-6 py-4 font-medium">Khách hàng</th>
+                      <th className="px-6 py-4 font-medium">Địa điểm</th>
+                      <th className="px-6 py-4 font-medium">Menu</th>
+                      <th className="px-6 py-4 font-medium">Chi tiết</th>
                     </tr>
                   </thead>
                   <tbody>
                     {pendingOrders.map((o, idx) => (
                       <tr
                         key={idx}
-                        className="border-t text-gray-700 hover:bg-gray-50"
+                        className="border-b last:border-b-0 border-[#F1F2F6] text-gray-700 hover:bg-[#FBFBFD]"
                       >
-                        <td className="px-5 py-4">{o.id}</td>
-                        <td className="px-5 py-4">{o.time}</td>
-                        <td className="px-5 py-4">{o.customer}</td>
-                        <td className="px-5 py-4">{o.location}</td>
-                        <td className="px-5 py-4">{o.menu}</td>
-                        <td className="px-5 py-4">
+                        <td className="px-6 py-5">{o.id}</td>
+                        <td className="px-6 py-5">{o.time}</td>
+                        <td className="px-6 py-5">{o.customer}</td>
+                        <td className="px-6 py-5">{o.location}</td>
+                        <td className="px-6 py-5">{o.menu}</td>
+                        <td className="px-6 py-5">
                           <button className="px-3 py-1 rounded-md hover:bg-gray-100">
-                            ...
+                            •••
                           </button>
                         </td>
                       </tr>
@@ -210,49 +203,48 @@ export default function OwnerDashboard() {
 function Tab({ label, active }) {
   return (
     <button
-      className={`px-4 py-2 rounded-md text-sm transition
+      type="button"
+      className={`px-4 py-2 rounded-md text-sm transition font-medium
         ${
           active ? "bg-[#E8712E] text-white" : "text-gray-700 hover:bg-gray-100"
         }`}
-      type="button"
     >
       {label}
     </button>
   );
 }
 
-function StatCard({ title, value, icon, badge, badgeUp, active }) {
+function StatCard({ title, value, icon, color, badge, badgeUp, active }) {
   return (
     <div
-      className={`bg-white rounded-xl border p-5 flex items-center justify-between
+      className={`bg-white rounded-xl border border-[#F1F2F6] px-6 py-5 flex items-center justify-between
         ${active ? "ring-2 ring-[#3b82f6]" : ""}`}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-4">
+        {/* icon circle */}
         <div
-          className={`h-10 w-10 rounded-full flex items-center justify-center
-            ${
-              title === "Doanh thu"
-                ? "bg-blue-50 text-blue-600"
-                : title === "Đơn hủy"
-                  ? "bg-red-50 text-red-600"
-                  : "bg-emerald-50 text-emerald-600"
-            }`}
+          className="h-11 w-11 rounded-full flex items-center justify-center"
+          style={{
+            backgroundColor: hexToRgba(color, 0.12),
+            color,
+          }}
         >
           {icon}
         </div>
 
-        <div>
-          <div className="text-sm text-gray-500">{title}</div>
-          <div className="text-2xl font-bold text-gray-900">{value}</div>
+        <div className="leading-tight">
+          <div className="text-sm text-[#94A3B8]">{title}</div>
+          <div className="text-2xl font-bold text-gray-900 mt-1">{value}</div>
         </div>
       </div>
 
       <div
-        className={`text-xs font-semibold ${
+        className={`text-xs font-semibold self-end ${
           badgeUp ? "text-emerald-600" : "text-red-500"
         }`}
       >
-        {badge}
+        {badgeUp ? "↑ " : "↓ "}
+        {badge.replace("+ ", "").replace("- ", "")}
       </div>
     </div>
   );
@@ -267,6 +259,7 @@ function AreaChartMock() {
           preserveAspectRatio="none"
           className="w-full h-full"
         >
+          {/* grid */}
           {[40, 90, 140, 190, 240].map((y, i) => (
             <line
               key={i}
@@ -274,18 +267,19 @@ function AreaChartMock() {
               y1={y}
               x2="1000"
               y2={y}
-              stroke="#f1f5f9"
+              stroke="#F1F2F6"
               strokeWidth="2"
             />
           ))}
 
           <defs>
             <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ef4444" stopOpacity="0.45" />
-              <stop offset="100%" stopColor="#ef4444" stopOpacity="0.05" />
+              <stop offset="0%" stopColor="#E54B2D" stopOpacity="0.55" />
+              <stop offset="100%" stopColor="#E54B2D" stopOpacity="0.08" />
             </linearGradient>
           </defs>
 
+          {/* line */}
           <path
             d="M 0 220
                C 120 70, 240 40, 320 90
@@ -293,10 +287,11 @@ function AreaChartMock() {
                C 620 60, 690 160, 760 200
                C 830 240, 900 120, 1000 140"
             fill="none"
-            stroke="#ef4444"
+            stroke="#E54B2D"
             strokeWidth="5"
           />
 
+          {/* area */}
           <path
             d="M 0 260
                L 0 220
@@ -310,9 +305,11 @@ function AreaChartMock() {
           />
         </svg>
 
-        <div className="absolute bottom-0 left-0 right-0 flex justify-between px-2 text-xs text-gray-400">
+        {/* x labels */}
+        <div className="absolute bottom-0 left-0 right-0 flex justify-between px-2 text-xs text-[#94A3B8]">
           {[
             "Jan",
+            "Feb",
             "Mar",
             "Apr",
             "May",
@@ -330,4 +327,14 @@ function AreaChartMock() {
       </div>
     </div>
   );
+}
+
+/* helper */
+function hexToRgba(hex, alpha = 1) {
+  const h = hex.replace("#", "");
+  const bigint = parseInt(h, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
