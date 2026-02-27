@@ -1,4 +1,5 @@
 import React from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutGrid,
   ChevronDown,
@@ -23,6 +24,25 @@ export default function Sidebar({ onExpandChange }) {
   const [openOrders, setOpenOrders] = React.useState(true);
   const [openAssign, setOpenAssign] = React.useState(true);
 
+  const { pathname } = useLocation();
+
+  const isManageActive = [
+    "/menu",
+    "/mon-an",
+    "/danh-muc",
+    "/dich-vu",
+    "/tiec",
+    "/kho",
+  ].some((p) => pathname.startsWith(p));
+
+  const isOrdersActive = ["/orders", "/tra-cuu"].some((p) =>
+    pathname.startsWith(p),
+  );
+
+  const isAssignActive = ["/nhan-vien", "/lich-trinh"].some((p) =>
+    pathname.startsWith(p),
+  );
+
   const handleEnter = () => {
     setExpanded(true);
     onExpandChange?.(true);
@@ -42,7 +62,7 @@ export default function Sidebar({ onExpandChange }) {
       ${expanded ? "w-72" : "w-20"}`}
     >
       {/* LOGO */}
-      <div className="h-20 flex items-center justify-center">
+      <div className="h-20 flex items-center justify-center border-b">
         <div className="font-logo text-[#E8712E] tracking-wide">
           {expanded ? (
             <span className="text-4xl">BOOKFET</span>
@@ -55,12 +75,11 @@ export default function Sidebar({ onExpandChange }) {
       <nav
         className={`flex-1 py-5 ${expanded ? "px-4" : "px-2"} text-gray-800`}
       >
-        {/* Tổng quan */}
-        <NavItem
+        <NavItemLink
+          to="/ownerdashboard"
           expanded={expanded}
           icon={<LayoutGrid className="h-5 w-5" />}
           label="Tổng quan"
-          active
         />
 
         {expanded && <SectionTitle>NHÀ HÀNG</SectionTitle>}
@@ -68,47 +87,91 @@ export default function Sidebar({ onExpandChange }) {
         {/* Quản lý */}
         <Dropdown
           expanded={expanded}
-          icon={<List className="h-5 w-5" />}
           label="Quản lý"
+          icon={<List className="h-5 w-5" />}
           open={openManage}
           onToggle={() => setOpenManage((v) => !v)}
+          forceActive={isManageActive}
         >
-          <SubItem icon={<BookOpen className="h-4 w-4" />} label="Menu" />
-          <SubItem icon={<Soup className="h-4 w-4" />} label="Món ăn" />
-          <SubItem icon={<Folder className="h-4 w-4" />} label="Danh mục" />
-          <SubItem
+          <SubItemLink
+            to="/owner/menu"
+            expanded={expanded}
+            icon={<BookOpen className="h-4 w-4" />}
+            label="Menu"
+          />
+          <SubItemLink
+            to="/owner/dish"
+            expanded={expanded}
+            icon={<Soup className="h-4 w-4" />}
+            label="Món ăn"
+          />
+          <SubItemLink
+            to="/owner/category"
+            expanded={expanded}
+            icon={<Folder className="h-4 w-4" />}
+            label="Danh mục"
+          />
+          <SubItemLink
+            to="/owner/service"
+            expanded={expanded}
             icon={<ConciergeBell className="h-4 w-4" />}
             label="Dịch vụ"
           />
-          <SubItem icon={<Gift className="h-4 w-4" />} label="Tiệc" />
-          <SubItem icon={<Warehouse className="h-4 w-4" />} label="Kho" />
+          <SubItemLink
+            to="/owner/party"
+            expanded={expanded}
+            icon={<Gift className="h-4 w-4" />}
+            label="Tiệc"
+          />
+          <SubItemLink
+            to="/owner/inventory"
+            expanded={expanded}
+            icon={<Warehouse className="h-4 w-4" />}
+            label="Kho"
+          />
         </Dropdown>
 
         {/* Đơn hàng */}
         <Dropdown
           expanded={expanded}
-          icon={<ClipboardList className="h-5 w-5" />}
           label="Đơn hàng"
+          icon={<ClipboardList className="h-5 w-5" />}
           open={openOrders}
           onToggle={() => setOpenOrders((v) => !v)}
+          forceActive={isOrdersActive}
         >
-          <SubItem
+          <SubItemLink
+            to="/owner/orders"
+            expanded={expanded}
             icon={<ClipboardList className="h-4 w-4" />}
             label="Quản lí đơn hàng"
           />
-          <SubItem icon={<Search className="h-4 w-4" />} label="Tra cứu" />
+          <SubItemLink
+            to="/owner/tracking"
+            expanded={expanded}
+            icon={<Search className="h-4 w-4" />}
+            label="Tra cứu"
+          />
         </Dropdown>
 
         {/* Phân công */}
         <Dropdown
           expanded={expanded}
-          icon={<Users className="h-5 w-5" />}
           label="Phân công"
+          icon={<Users className="h-5 w-5" />}
           open={openAssign}
           onToggle={() => setOpenAssign((v) => !v)}
+          forceActive={isAssignActive}
         >
-          <SubItem icon={<Users className="h-4 w-4" />} label="Nhân viên" />
-          <SubItem
+          <SubItemLink
+            to="/owner/staff"
+            expanded={expanded}
+            icon={<Users className="h-4 w-4" />}
+            label="Nhân viên"
+          />
+          <SubItemLink
+            to="/owner/schedule"
+            expanded={expanded}
             icon={<CalendarDays className="h-4 w-4" />}
             label="Lịch trình"
           />
@@ -122,7 +185,8 @@ export default function Sidebar({ onExpandChange }) {
           </>
         )}
 
-        <NavItem
+        <NavItemLink
+          to="/owner/account"
           expanded={expanded}
           icon={<User className="h-5 w-5" />}
           label="Tài khoản"
@@ -132,8 +196,6 @@ export default function Sidebar({ onExpandChange }) {
   );
 }
 
-/* ---------- COMPONENTS ---------- */
-
 function SectionTitle({ children }) {
   return (
     <div className="mt-5 mb-2 px-2 text-xs font-semibold tracking-widest text-gray-400">
@@ -142,51 +204,92 @@ function SectionTitle({ children }) {
   );
 }
 
-function NavItem({ icon, label, active, expanded }) {
+function NavItemLink({ to, icon, label, expanded }) {
   return (
-    <button
-      type="button"
-      className={`w-full flex items-center ${
-        expanded ? "gap-3 px-4" : "justify-center"
-      } py-3 rounded-xl text-sm transition
-        ${
-          active
-            ? "bg-[#FBE7D5] text-[#E8712E] font-semibold"
-            : "hover:bg-gray-100"
-        }`}
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        `w-full flex items-center py-3 rounded-xl text-sm transition
+         ${expanded ? "px-4 gap-3" : "justify-center px-0"}
+         ${
+           isActive
+             ? "bg-[#FBE7D5] text-[#E8712E] font-semibold"
+             : "text-gray-800 hover:bg-gray-100"
+         }`
+      }
       title={!expanded ? label : undefined}
     >
-      <span className={active ? "text-[#E8712E]" : "text-gray-500"}>
-        {icon}
-      </span>
-      {expanded && <span>{label}</span>}
-    </button>
+      {({ isActive }) => (
+        <>
+          <span className={isActive ? "text-[#E8712E]" : "text-gray-500"}>
+            {icon}
+          </span>
+          <span
+            className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-out
+              ${
+                expanded
+                  ? "max-w-[220px] opacity-100 translate-x-0"
+                  : "max-w-0 opacity-0 -translate-x-2"
+              }`}
+          >
+            {label}
+          </span>
+        </>
+      )}
+    </NavLink>
   );
 }
 
-function Dropdown({ icon, label, open, onToggle, children, expanded }) {
+function Dropdown({
+  icon,
+  label,
+  open,
+  onToggle,
+  children,
+  expanded,
+  forceActive,
+}) {
+  const active = !!forceActive;
+
   return (
     <div className="mt-1">
       <button
         type="button"
         onClick={expanded ? onToggle : undefined}
-        className={`w-full flex items-center ${
-          expanded ? "justify-between px-4" : "justify-center"
-        } py-3 rounded-xl text-sm hover:bg-gray-100 transition`}
+        className={`w-full flex items-center py-3 rounded-xl text-sm transition
+          ${expanded ? "justify-between px-4" : "justify-center px-0"}
+          ${active ? "bg-[#F3F4F6]" : "hover:bg-gray-100"}
+        `}
         title={!expanded ? label : undefined}
       >
         <div className={`flex items-center ${expanded ? "gap-3" : ""}`}>
           <span className="text-gray-500">{icon}</span>
-          {expanded && <span className="font-semibold">{label}</span>}
+
+          <span
+            className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-out
+              ${
+                expanded
+                  ? "max-w-[220px] opacity-100 translate-x-0"
+                  : "max-w-0 opacity-0 -translate-x-2"
+              }`}
+          >
+            <span className={`font-semibold ${active ? "text-gray-900" : ""}`}>
+              {label}
+            </span>
+          </span>
         </div>
 
-        {expanded && (
+        <span
+          className={`transition-all duration-300 ease-out
+            ${expanded ? "opacity-100 translate-x-0" : "opacity-0 translate-x-2"}
+          `}
+        >
           <ChevronDown
-            className={`h-4 w-4 text-gray-500 transition-transform ${
+            className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${
               open ? "rotate-180" : ""
             }`}
           />
-        )}
+        </span>
       </button>
 
       {open && (
@@ -204,21 +307,41 @@ function Dropdown({ icon, label, open, onToggle, children, expanded }) {
   );
 }
 
-function SubItem({ icon, label, expanded }) {
+function SubItemLink({ to, icon, label, expanded }) {
   return (
-    <button
-      type="button"
-      className={`${
-        expanded
-          ? "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm hover:bg-gray-100"
-          : "h-11 w-11 flex items-center justify-center rounded-xl hover:bg-gray-100"
-      } transition`}
+    <NavLink
+      to={to}
+      className={({ isActive }) =>
+        `${
+          expanded
+            ? "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm"
+            : "h-11 w-11 flex items-center justify-center rounded-xl"
+        } transition ${isActive ? "bg-[#FBE7D5] text-[#E8712E]" : "hover:bg-gray-100"}`
+      }
       title={!expanded ? label : undefined}
     >
-      <span className="text-gray-500">
-        {expanded ? icon : React.cloneElement(icon, { className: "h-5 w-5" })}
-      </span>
-      {expanded && <span className="text-gray-800 font-medium">{label}</span>}
-    </button>
+      {({ isActive }) => (
+        <>
+          <span className={isActive ? "text-[#E8712E]" : "text-gray-500"}>
+            {expanded
+              ? icon
+              : React.cloneElement(icon, { className: "h-5 w-5" })}
+          </span>
+
+          <span
+            className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-out
+              ${
+                expanded
+                  ? "max-w-[200px] opacity-100 translate-x-0"
+                  : "max-w-0 opacity-0 -translate-x-2"
+              }`}
+          >
+            <span className={`font-medium ${isActive ? "" : "text-gray-800"}`}>
+              {label}
+            </span>
+          </span>
+        </>
+      )}
+    </NavLink>
   );
 }

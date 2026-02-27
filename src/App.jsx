@@ -9,6 +9,8 @@ import {
 } from "react-router-dom";
 import LoginPage from "@/pages/LoginPage";
 import OwnerDashboard from "@/pages/Owner/OwnerDashboard";
+import OwnerMenu from "@/pages/Owner/OwnerMenu";
+import OwnerDish from "@/pages/Owner/OwnerDish";
 export default function App() {
   return (
     <Router>
@@ -17,7 +19,11 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/login" />} />
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/ownerdashboard" element={<OwnerDashboard />} />
+            <Route path="/owner">
+              <Route path="dashboard" element={<OwnerDashboard />} />
+              <Route path="menu" element={<OwnerMenu />} />
+              <Route path="dish" element={<OwnerDish />} />
+            </Route>
           </Routes>
           <Toaster />
         </main>

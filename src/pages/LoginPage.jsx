@@ -105,7 +105,7 @@ export default function LoginPage() {
         storage.setItem("userProfile", JSON.stringify(user));
       }
 
-      navigate("/ownerdashboard");
+      navigate("/owner/dashboard");
     } catch (err) {
       setError(err?.message || "Đăng nhập thất bại. Vui lòng thử lại.");
     } finally {

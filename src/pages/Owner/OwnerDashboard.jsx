@@ -35,7 +35,7 @@ export default function OwnerDashboard() {
       title: "Doanh thu",
       value: "123,123,123",
       icon: <DollarSign className="h-5 w-5" />,
-      color: "#3B82F6", // nếu bạn có mã chuẩn, gửi mình đổi
+      color: "#3B82F6",
       badge: "- 9.6%",
       badgeUp: false,
       active: false,
@@ -69,7 +69,7 @@ export default function OwnerDashboard() {
         }`}
       >
         {/* TOP BAR */}
-        <header className="sticky top-0 z-10 bg-white border-b">
+        <header className="sticky top-0 z-10 bg-white">
           <div className="h-16 px-7 flex items-center justify-between">
             <h2 className="text-lg font-semibold tracking-wide text-[#1f2937]">
               TỔNG QUAN
