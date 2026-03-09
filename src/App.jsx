@@ -11,6 +11,7 @@ import LoginPage from "@/pages/LoginPage";
 import OwnerDashboard from "@/pages/Owner/OwnerDashboard";
 import OwnerMenu from "@/pages/Owner/OwnerMenu";
 import OwnerDish from "@/pages/Owner/OwnerDish";
+import OwnerDishCategory from "@/pages/Owner/OwnerDishCategory";
 export default function App() {
   return (
     <Router>
@@ -23,6 +24,7 @@ export default function App() {
               <Route path="dashboard" element={<OwnerDashboard />} />
               <Route path="menu" element={<OwnerMenu />} />
               <Route path="dish" element={<OwnerDish />} />
+              <Route path="dish-category" element={<OwnerDishCategory />} />
             </Route>
           </Routes>
           <Toaster />

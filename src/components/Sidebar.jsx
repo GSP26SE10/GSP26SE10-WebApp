@@ -76,7 +76,7 @@ export default function Sidebar({ onExpandChange }) {
         className={`flex-1 py-5 ${expanded ? "px-4" : "px-2"} text-gray-800`}
       >
         <NavItemLink
-          to="/ownerdashboard"
+          to="/owner/dashboard"
           expanded={expanded}
           icon={<LayoutGrid className="h-5 w-5" />}
           label="Tổng quan"
@@ -106,7 +106,7 @@ export default function Sidebar({ onExpandChange }) {
             label="Món ăn"
           />
           <SubItemLink
-            to="/owner/category"
+            to="/owner/dish-category"
             expanded={expanded}
             icon={<Folder className="h-4 w-4" />}
             label="Danh mục"
