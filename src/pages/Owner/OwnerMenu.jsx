@@ -10,72 +10,125 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import API_URL from "@/config/api";
 
 export default function OwnerMenu() {
   const [sbExpanded, setSbExpanded] = React.useState(false);
+
   const [menus, setMenus] = React.useState([]);
   const [dishes, setDishes] = React.useState([]);
+  const [menuDishLinks, setMenuDishLinks] = React.useState([]);
+
   const [search, setSearch] = React.useState("");
   const [page, setPage] = React.useState(1);
-  const [pageSize] = React.useState(3);
+  const pageSize = 3;
   const [totalPages, setTotalPages] = React.useState(1);
+
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
-  const [openFilter, setOpenFilter] = React.useState(false);
-  const [openAddModal, setOpenAddModal] = React.useState(false);
-  const [submitting, setSubmitting] = React.useState(false);
-  const [modalError, setModalError] = React.useState("");
-  const [modalSuccess, setModalSuccess] = React.useState("");
 
+  const [openFilter, setOpenFilter] = React.useState(false);
   const [filters, setFilters] = React.useState({
     status: "all",
     priceMin: "",
     priceMax: "",
   });
 
+  const [openAddModal, setOpenAddModal] = React.useState(false);
+  const [openDetailModal, setOpenDetailModal] = React.useState(false);
+
+  const [selectedMenu, setSelectedMenu] = React.useState(null);
+
   const [menuForm, setMenuForm] = React.useState({
     menuName: "",
     menuCategoryId: "",
+    partyCategoryName: "",
     basePrice: "",
     imgUrl: "",
+    selectedDishIds: [],
   });
 
+  const [submitting, setSubmitting] = React.useState(false);
+  const [updating, setUpdating] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+  const [modalError, setModalError] = React.useState("");
+  const [modalSuccess, setModalSuccess] = React.useState("");
+  const [menuImageFile, setMenuImageFile] = React.useState(null);
+  const [menuImagePreview, setMenuImagePreview] = React.useState("");
+
+  const menuCategoryOptions = [
+    { value: 1, label: "Buffet bò" },
+    { value: 2, label: "Buffet hải sản" },
+    { value: 3, label: "Buffet chay" },
+  ];
+
+  const partyCategoryOptions = [
+    { value: "Birthday Party", label: "Birthday Party" },
+    { value: "Wedding Party", label: "Wedding Party" },
+    { value: "Conference", label: "Conference" },
+  ];
+  const resetMenuImage = () => {
+    setMenuImageFile(null);
+    setMenuImagePreview("");
+  };
+
+  const handleMenuImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setMenuImageFile(file);
+
+    const previewUrl = URL.createObjectURL(file);
+    setMenuImagePreview(previewUrl);
+  };
   const fetchData = React.useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      const [menuRes, dishRes] = await Promise.all([
+      const [menuRes, dishRes, menuDishRes] = await Promise.all([
         fetch(`${API_URL}/api/menu?page=${page}&pageSize=${pageSize}`, {
           headers: { accept: "*/*" },
         }),
-        fetch(`${API_URL}/api/dish?page=1&pageSize=20`, {
+        fetch(`${API_URL}/api/dish?page=1&pageSize=200`, {
+          headers: { accept: "*/*" },
+        }),
+        fetch(`${API_URL}/api/menu-dish?page=1&pageSize=1000`, {
           headers: { accept: "*/*" },
         }),
       ]);
 
       const menuData = await menuRes.json();
       const dishData = await dishRes.json();
+      const menuDishData = await menuDishRes.json();
 
       if (!menuRes.ok) {
         throw new Error(menuData?.message || "Không thể tải danh sách menu");
       }
-
       if (!dishRes.ok) {
         throw new Error(dishData?.message || "Không thể tải danh sách món");
+      }
+      if (!menuDishRes.ok) {
+        throw new Error(
+          menuDishData?.message || "Không thể tải danh sách menu-món",
+        );
       }
 
       setMenus(Array.isArray(menuData?.items) ? menuData.items : []);
       setDishes(Array.isArray(dishData?.items) ? dishData.items : []);
+      setMenuDishLinks(
+        Array.isArray(menuDishData?.items) ? menuDishData.items : [],
+      );
       setTotalPages(Number(menuData?.totalPages || 1));
     } catch (err) {
       setError(err.message || "Đã có lỗi xảy ra");
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize]);
+  }, [page]);
 
   React.useEffect(() => {
     fetchData();
@@ -108,15 +161,31 @@ export default function OwnerMenu() {
     return matchSearch && matchStatus && matchMin && matchMax;
   });
 
-  const previewItems = dishes.slice(0, 5);
-
   const resetForm = () => {
     setMenuForm({
       menuName: "",
       menuCategoryId: "",
+      partyCategoryName: "",
       basePrice: "",
       imgUrl: "",
+      selectedDishIds: [],
     });
+    resetMenuImage();
+  };
+
+  const getMenuDishIds = (menuId) => {
+    return menuDishLinks
+      .filter((x) => Number(x.menuId) === Number(menuId))
+      .map((x) => Number(x.dishId));
+  };
+
+  const getMenuPreviewDishes = (menuId) => {
+    const ids = getMenuDishIds(menuId);
+    return dishes.filter((d) => ids.includes(Number(d.dishId))).slice(0, 5);
+  };
+
+  const getMenuDishRelations = (menuId) => {
+    return menuDishLinks.filter((x) => Number(x.menuId) === Number(menuId));
   };
 
   const openCreateModal = () => {
@@ -126,10 +195,62 @@ export default function OwnerMenu() {
     setOpenAddModal(true);
   };
 
-  const closeCreateModal = () => {
-    setOpenAddModal(false);
+  const openMenuDetail = (menu) => {
+    setSelectedMenu(menu);
+    setMenuForm({
+      menuName: menu.menuName || "",
+      menuCategoryId: String(menu.menuCategoryId || ""),
+      partyCategoryName: menu.partyCategoryName || "",
+      basePrice: String(menu.basePrice || ""),
+      imgUrl: menu.imgUrl || "",
+      selectedDishIds: getMenuDishIds(menu.menuId),
+    });
+    setMenuImageFile(null);
+    setMenuImagePreview(getMenuImageUrl(menu.imgUrl));
     setModalError("");
     setModalSuccess("");
+    setOpenDetailModal(true);
+  };
+
+  const closeAllModals = () => {
+    setOpenAddModal(false);
+    setOpenDetailModal(false);
+    setSelectedMenu(null);
+    setModalError("");
+    setModalSuccess("");
+  };
+
+  const syncMenuDishes = async (menuId, selectedDishIds) => {
+    const currentRelations = getMenuDishRelations(menuId);
+    const currentDishIds = currentRelations.map((x) => Number(x.dishId));
+
+    const toAdd = selectedDishIds.filter(
+      (id) => !currentDishIds.includes(Number(id)),
+    );
+    const toDelete = currentRelations.filter(
+      (rel) => !selectedDishIds.includes(Number(rel.dishId)),
+    );
+
+    for (const dishId of toAdd) {
+      await fetch(`${API_URL}/api/menu-dish`, {
+        method: "POST",
+        headers: {
+          accept: "*/*",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          menuId: Number(menuId),
+          dishId: Number(dishId),
+        }),
+      });
+    }
+
+    for (const rel of toDelete) {
+      await fetch(`${API_URL}/api/menu-dish/${rel.menuDishId}`, {
+        method: "DELETE",
+        headers: { accept: "*/*" },
+      });
+    }
   };
 
   const handleCreateMenu = async (e) => {
@@ -165,6 +286,13 @@ export default function OwnerMenu() {
         throw new Error(data?.message || "Thêm menu thất bại");
       }
 
+      const createdMenuId =
+        data?.menuId || data?.data?.menuId || data?.id || data?.data?.id;
+
+      if (createdMenuId && menuForm.selectedDishIds.length > 0) {
+        await syncMenuDishes(createdMenuId, menuForm.selectedDishIds);
+      }
+
       setModalSuccess("Thêm menu thành công.");
       resetForm();
       await fetchData();
@@ -178,6 +306,117 @@ export default function OwnerMenu() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleUpdateMenu = async (e) => {
+    e.preventDefault();
+    if (!selectedMenu?.menuId) return;
+
+    setUpdating(true);
+    setModalError("");
+    setModalSuccess("");
+
+    try {
+      const payload = {
+        menuName: menuForm.menuName.trim(),
+        menuCategoryId: Number(menuForm.menuCategoryId),
+        basePrice: Number(menuForm.basePrice),
+        imgUrl: menuForm.imgUrl.trim(),
+      };
+
+      if (!payload.menuName || !payload.menuCategoryId || !payload.basePrice) {
+        throw new Error("Vui lòng nhập đầy đủ thông tin bắt buộc.");
+      }
+
+      const res = await fetch(`${API_URL}/api/menu/${selectedMenu.menuId}`, {
+        method: "PUT",
+        headers: {
+          accept: "*/*",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Cập nhật menu thất bại");
+      }
+
+      await syncMenuDishes(selectedMenu.menuId, menuForm.selectedDishIds);
+      await fetchData();
+
+      setModalSuccess("Cập nhật menu thành công.");
+
+      setTimeout(() => {
+        setOpenDetailModal(false);
+        setSelectedMenu(null);
+        setModalSuccess("");
+      }, 700);
+    } catch (err) {
+      setModalError(err.message || "Đã có lỗi xảy ra");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeleteMenu = async () => {
+    if (!selectedMenu?.menuId) return;
+
+    const confirmed = window.confirm(
+      `Bạn có chắc muốn xóa menu "${selectedMenu.menuName}" không?`,
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setModalError("");
+
+    try {
+      const relations = getMenuDishRelations(selectedMenu.menuId);
+
+      for (const rel of relations) {
+        await fetch(`${API_URL}/api/menu-dish/${rel.menuDishId}`, {
+          method: "DELETE",
+          headers: { accept: "*/*" },
+        });
+      }
+
+      const res = await fetch(`${API_URL}/api/menu/${selectedMenu.menuId}`, {
+        method: "DELETE",
+        headers: { accept: "*/*" },
+      });
+
+      let data = {};
+      try {
+        data = await res.json();
+      } catch {
+        data = {};
+      }
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Xóa menu thất bại");
+      }
+
+      await fetchData();
+      setOpenDetailModal(false);
+      setSelectedMenu(null);
+    } catch (err) {
+      setModalError(err.message || "Đã có lỗi xảy ra");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const toggleDishSelection = (dishId) => {
+    setMenuForm((prev) => {
+      const exists = prev.selectedDishIds.includes(Number(dishId));
+      return {
+        ...prev,
+        selectedDishIds: exists
+          ? prev.selectedDishIds.filter((id) => Number(id) !== Number(dishId))
+          : [...prev.selectedDishIds, Number(dishId)],
+      };
+    });
   };
 
   return (
@@ -376,12 +615,13 @@ export default function OwnerMenu() {
           ) : filteredMenus.length === 0 ? (
             <div className="text-sm text-gray-500">Không có menu phù hợp.</div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
               {filteredMenus.map((menu) => (
                 <MenuCard
                   key={menu.menuId}
                   menu={menu}
-                  previewItems={previewItems}
+                  previewItems={getMenuPreviewDishes(menu.menuId)}
+                  onClick={() => openMenuDetail(menu)}
                 />
               ))}
             </div>
@@ -390,20 +630,49 @@ export default function OwnerMenu() {
       </div>
 
       {openAddModal && (
-        <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-4">
-          <div className="w-full max-w-xl bg-white rounded-2xl shadow-xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
+        <div className="fixed inset-0 z-[100] bg-black/20 backdrop-blur-[2px] flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl max-h-[90vh] bg-white rounded-2xl shadow-xl overflow-hidden">
+            <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b bg-white">
               <h2 className="text-lg font-bold text-gray-900">Thêm menu mới</h2>
               <button
                 type="button"
-                onClick={closeCreateModal}
+                onClick={closeAllModals}
                 className="p-2 rounded-full hover:bg-gray-100"
               >
                 <X className="h-5 w-5 text-gray-600" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateMenu} className="p-6 space-y-4">
+            <form
+              onSubmit={handleCreateMenu}
+              className="hide-scrollbar max-h-[calc(90vh-80px)] overflow-y-auto p-6 space-y-5"
+            >
+              <div className="flex flex-col items-center gap-3 pb-1">
+                <div className="h-44 w-full overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 flex items-center justify-center">
+                  {menuImagePreview ? (
+                    <img
+                      src={menuImagePreview}
+                      alt="preview"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-sm text-gray-400">
+                      Chưa có ảnh menu
+                    </span>
+                  )}
+                </div>
+
+                <label className="inline-flex cursor-pointer items-center rounded-lg border border-[#F2B9A5] bg-[#FFFAF0] px-4 py-2 text-sm font-semibold text-[#E8712E] hover:bg-[#FFF3EA] transition">
+                  Chọn ảnh từ máy
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleMenuImageChange}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
               <Field
                 label="Tên menu"
                 value={menuForm.menuName}
@@ -414,36 +683,99 @@ export default function OwnerMenu() {
               />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Field
-                  label="Menu Category ID"
-                  type="number"
-                  value={menuForm.menuCategoryId}
-                  onChange={(v) =>
-                    setMenuForm((prev) => ({
-                      ...prev,
-                      menuCategoryId: v,
-                    }))
-                  }
-                  required
-                />
-                <Field
-                  label="Giá cơ bản"
-                  type="number"
-                  value={menuForm.basePrice}
-                  onChange={(v) =>
-                    setMenuForm((prev) => ({ ...prev, basePrice: v }))
-                  }
-                  required
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Loại menu
+                  </label>
+                  <select
+                    value={menuForm.menuCategoryId}
+                    onChange={(e) =>
+                      setMenuForm((prev) => ({
+                        ...prev,
+                        menuCategoryId: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
+                  >
+                    <option value="">Chọn loại menu</option>
+                    {menuCategoryOptions.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Loại tiệc
+                  </label>
+                  <select
+                    value={menuForm.partyCategoryName}
+                    onChange={(e) =>
+                      setMenuForm((prev) => ({
+                        ...prev,
+                        partyCategoryName: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
+                  >
+                    <option value="">Chọn loại tiệc</option>
+                    {partyCategoryOptions.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <Field
-                label="Ảnh menu (URL)"
+                label="Giá cơ bản"
+                type="number"
+                value={menuForm.basePrice}
+                onChange={(v) =>
+                  setMenuForm((prev) => ({ ...prev, basePrice: v }))
+                }
+                required
+              />
+
+              <Field
+                label="Ảnh menu (URL lưu backend)"
                 value={menuForm.imgUrl}
                 onChange={(v) =>
                   setMenuForm((prev) => ({ ...prev, imgUrl: v }))
                 }
               />
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Chọn món cho menu
+                </label>
+                <div className="max-h-64 overflow-y-auto rounded-xl border border-gray-200 p-3 space-y-2">
+                  {dishes.map((dish) => {
+                    const checked = menuForm.selectedDishIds.includes(
+                      Number(dish.dishId),
+                    );
+
+                    return (
+                      <label
+                        key={dish.dishId}
+                        className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-gray-50"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleDishSelection(dish.dishId)}
+                        />
+                        <span className="text-sm text-gray-800">
+                          {dish.dishName}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
 
               {modalError && (
                 <div className="text-sm text-red-500">{modalError}</div>
@@ -455,7 +787,7 @@ export default function OwnerMenu() {
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={closeCreateModal}
+                  onClick={closeAllModals}
                   className="h-10 px-4 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition"
                 >
                   Hủy
@@ -472,15 +804,208 @@ export default function OwnerMenu() {
           </div>
         </div>
       )}
+
+      {openDetailModal && selectedMenu && (
+        <div className="fixed inset-0 z-[100] bg-black/20 backdrop-blur-[2px] flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl max-h-[90vh] bg-white rounded-2xl shadow-xl overflow-hidden">
+            <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b bg-white">
+              <h2 className="text-lg font-bold text-gray-900">Chi tiết menu</h2>
+              <button
+                type="button"
+                onClick={closeAllModals}
+                className="p-2 rounded-full hover:bg-gray-100"
+              >
+                <X className="h-5 w-5 text-gray-600" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleUpdateMenu}
+              className="hide-scrollbar max-h-[calc(90vh-80px)] overflow-y-auto p-6 space-y-5"
+            >
+              <div className="flex flex-col items-center gap-3 pb-1">
+                <div className="h-44 w-full overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 flex items-center justify-center">
+                  {menuImagePreview ? (
+                    <img
+                      src={menuImagePreview}
+                      alt="preview"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-sm text-gray-400">
+                      Chưa có ảnh menu
+                    </span>
+                  )}
+                </div>
+
+                <label className="inline-flex cursor-pointer items-center rounded-lg border border-[#F2B9A5] bg-[#FFFAF0] px-4 py-2 text-sm font-semibold text-[#E8712E] hover:bg-[#FFF3EA] transition">
+                  Chọn ảnh từ máy
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleMenuImageChange}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              <Field
+                label="Tên menu"
+                value={menuForm.menuName}
+                onChange={(v) =>
+                  setMenuForm((prev) => ({ ...prev, menuName: v }))
+                }
+                required
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Loại menu
+                  </label>
+                  <select
+                    value={menuForm.menuCategoryId}
+                    onChange={(e) =>
+                      setMenuForm((prev) => ({
+                        ...prev,
+                        menuCategoryId: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
+                  >
+                    <option value="">Chọn loại menu</option>
+                    {menuCategoryOptions.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Loại tiệc
+                  </label>
+                  <select
+                    value={menuForm.partyCategoryName}
+                    onChange={(e) =>
+                      setMenuForm((prev) => ({
+                        ...prev,
+                        partyCategoryName: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
+                  >
+                    <option value="">Chọn loại tiệc</option>
+                    {partyCategoryOptions.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <Field
+                label="Giá cơ bản"
+                type="number"
+                value={menuForm.basePrice}
+                onChange={(v) =>
+                  setMenuForm((prev) => ({ ...prev, basePrice: v }))
+                }
+                required
+              />
+
+              <Field
+                label="Ảnh menu (URL lưu backend)"
+                value={menuForm.imgUrl}
+                onChange={(v) =>
+                  setMenuForm((prev) => ({ ...prev, imgUrl: v }))
+                }
+              />
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Chọn món cho menu
+                </label>
+                <div className="max-h-64 overflow-y-auto rounded-xl border border-gray-200 p-3 space-y-2">
+                  {dishes.map((dish) => {
+                    const checked = menuForm.selectedDishIds.includes(
+                      Number(dish.dishId),
+                    );
+
+                    return (
+                      <label
+                        key={dish.dishId}
+                        className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-gray-50"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleDishSelection(dish.dishId)}
+                        />
+                        <span className="text-sm text-gray-800">
+                          {dish.dishName}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {modalError && (
+                <div className="text-sm text-red-500">{modalError}</div>
+              )}
+              {modalSuccess && (
+                <div className="text-sm text-green-600">{modalSuccess}</div>
+              )}
+
+              <div className="flex justify-between gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleDeleteMenu}
+                  disabled={deleting}
+                  className="h-10 px-4 rounded-lg bg-red-50 text-red-600 font-semibold flex items-center gap-2 hover:bg-red-100 transition disabled:opacity-60"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {deleting ? "Đang xóa..." : "Xóa menu"}
+                </button>
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={closeAllModals}
+                    className="h-10 px-4 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updating}
+                    className="h-10 px-4 rounded-lg bg-[#E8712E] text-white font-semibold flex items-center gap-2 hover:opacity-90 transition disabled:opacity-60"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    {updating ? "Đang lưu..." : "Cập nhật"}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function MenuCard({ menu, previewItems }) {
+function MenuCard({ menu, previewItems, onClick }) {
   const imgSrc = getMenuImageUrl(menu.imgUrl);
 
   return (
-    <section className="bg-white rounded-xl border border-[#F1F2F6] shadow-[0_6px_18px_rgba(15,23,42,0.08)] overflow-hidden">
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-left bg-white rounded-xl border border-[#F1F2F6] shadow-[0_6px_18px_rgba(15,23,42,0.08)] overflow-hidden transition hover:shadow-[0_10px_24px_rgba(15,23,42,0.12)] h-fit"
+    >
       <div className="px-6 pt-6">
         <div className="text-[#E8712E] font-bold">{menu.menuName}</div>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-400">
@@ -520,7 +1045,7 @@ function MenuCard({ menu, previewItems }) {
                 />
               </div>
 
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-gray-900">
                   {it.dishName}
                 </div>
@@ -539,7 +1064,7 @@ function MenuCard({ menu, previewItems }) {
           {formatPrice(menu.basePrice)}
         </div>
       </div>
-    </section>
+    </button>
   );
 }
 
