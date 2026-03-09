@@ -8,80 +8,83 @@ import {
   SlidersHorizontal,
   Plus,
 } from "lucide-react";
+import API_URL from "@/config/api";
 
 export default function OwnerFood() {
   const [sbExpanded, setSbExpanded] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState("Tất cả");
+  const [search, setSearch] = React.useState("");
+  const [categories, setCategories] = React.useState([]);
+  const [dishes, setDishes] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState("");
 
-  const tabs = ["Tất cả", "Bò", "Hải sản", "Gà", "Món chay"];
+  React.useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError("");
 
-  const dishes = [
-    {
-      id: 1,
-      name: "Súp hải sản",
-      price: "100.000 VNĐ",
-      note: "Hấp dẫn với vị ngọt thanh và mang lại\nnhiều lợi ích cho sức khỏe",
-      ingredients:
-        "Thành phần: Tôm, Mực, Hành lá, Bột\nnăng, Cá, Thịt Heo, Gà, Bò, Nấm, Cà rốt",
-      category: "Hải sản",
-      img: "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=800&q=70",
-    },
-    {
-      id: 2,
-      name: "Chả giò hải sản",
-      price: "100.000 VNĐ",
-      note: "Món này rất ngon\nMón này rất ngon",
-      ingredients:
-        "Thành phần: Tôm, Mực, Hành lá, Bột\nnăng, Cá, Thịt Heo, Gà, Bò, Nấm, Cà rốt",
-      category: "Hải sản",
-      img: "https://images.unsplash.com/photo-1553621042-f6e147245754?auto=format&fit=crop&w=800&q=70",
-    },
-    {
-      id: 3,
-      name: "Cá chiên giòn",
-      price: "100.000 VNĐ",
-      note: "Món này rất ngon\nMón này rất ngon",
-      ingredients:
-        "Thành phần: Tôm, Mực, Hành lá, Bột\nnăng, Cá, Thịt Heo, Gà, Bò, Nấm, Cà rốt",
-      category: "Hải sản",
-      img: "https://images.unsplash.com/photo-1551218808-94e220e084d2?auto=format&fit=crop&w=800&q=70",
-    },
-    {
-      id: 4,
-      name: "Súp hải sản",
-      price: "100.000 VNĐ",
-      note: "Hấp dẫn với vị ngọt thanh và mang lại\nnhiều lợi ích cho sức khỏe",
-      ingredients:
-        "Thành phần: Tôm, Mực, Hành lá, Bột\nnăng, Cá, Thịt Heo, Gà, Bò, Nấm, Cà rốt",
-      category: "Hải sản",
-      img: "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=800&q=70",
-    },
-    {
-      id: 5,
-      name: "Chả giò hải sản",
-      price: "100.000 VNĐ",
-      note: "Món này rất ngon\nMón này rất ngon",
-      ingredients:
-        "Thành phần: Tôm, Mực, Hành lá, Bột\nnăng, Cá, Thịt Heo, Gà, Bò, Nấm, Cà rốt",
-      category: "Hải sản",
-      img: "https://images.unsplash.com/photo-1553621042-f6e147245754?auto=format&fit=crop&w=800&q=70",
-    },
-    {
-      id: 6,
-      name: "Cá chiên giòn",
-      price: "100.000 VNĐ",
-      note: "Món này rất ngon\nMón này rất ngon",
-      ingredients:
-        "Thành phần: Tôm, Mực, Hành lá, Bột\nnăng, Cá, Thịt Heo, Gà, Bò, Nấm, Cà rốt",
-      category: "Hải sản",
-      img: "https://images.unsplash.com/photo-1551218808-94e220e084d2?auto=format&fit=crop&w=800&q=70",
-    },
+      try {
+        const [categoryRes, dishRes] = await Promise.all([
+          fetch(`${API_URL}/api/dish-category?page=1&pageSize=10`, {
+            headers: { accept: "*/*" },
+          }),
+          fetch(`${API_URL}/api/dish?page=1&pageSize=100`, {
+            headers: { accept: "*/*" },
+          }),
+        ]);
+
+        const categoryData = await categoryRes.json();
+        const dishData = await dishRes.json();
+
+        if (!categoryRes.ok) {
+          throw new Error(
+            categoryData?.message || "Không thể tải danh mục món",
+          );
+        }
+
+        if (!dishRes.ok) {
+          throw new Error(dishData?.message || "Không thể tải danh sách món");
+        }
+
+        setCategories(
+          Array.isArray(categoryData?.items) ? categoryData.items : [],
+        );
+        setDishes(Array.isArray(dishData?.items) ? dishData.items : []);
+      } catch (err) {
+        setError(err.message || "Đã có lỗi xảy ra");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const tabs = [
+    { key: "Tất cả", label: "Tất cả" },
+    ...categories.map((c) => ({
+      key: c.dishCategoryId,
+      label: c.dishCategoryName,
+    })),
   ];
 
-  const filtered =
-    activeTab === "Tất cả"
-      ? dishes
-      : dishes.filter((d) => d.category === activeTab);
+  const filtered = dishes.filter((dish) => {
+    const matchTab =
+      activeTab === "Tất cả" ||
+      dish.dishCategoryId === activeTab ||
+      dish.dishCategoryName === activeTab;
+
+    const keyword = search.trim().toLowerCase();
+    const matchSearch =
+      !keyword ||
+      dish.dishName?.toLowerCase().includes(keyword) ||
+      dish.description?.toLowerCase().includes(keyword) ||
+      dish.note?.toLowerCase().includes(keyword) ||
+      dish.dishCategoryName?.toLowerCase().includes(keyword);
+
+    return matchTab && matchSearch;
+  });
 
   return (
     <div className="min-h-screen bg-[#FFFAF0] font-main">
@@ -104,6 +107,8 @@ export default function OwnerFood() {
               <div className="hidden md:flex items-center gap-2 bg-[#F6F7FB] border border-[#EEF0F6] rounded-full px-4 py-2 w-[360px]">
                 <Search className="h-4 w-4 text-gray-400" />
                 <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
                   className="bg-transparent outline-none text-sm w-full text-gray-700 placeholder:text-gray-400"
                   placeholder="Tìm"
                 />
@@ -152,31 +157,47 @@ export default function OwnerFood() {
           </div>
 
           <div className="w-full">
-            <div className="flex items-center justify-between text-sm font-semibold text-[#E8712E] px-2">
-              {tabs.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setActiveTab(t)}
-                  className={`relative pb-4 transition ${
-                    t === activeTab ? "text-[#E8712E]" : "text-[#E8712E]/70"
-                  }`}
-                >
-                  {t}
-                  {t === activeTab && (
-                    <span className="absolute left-0 -bottom-[1px] h-[3px] w-full bg-[#E54B2D] rounded-full" />
-                  )}
-                </button>
-              ))}
+            <div className="relative">
+              <div className="flex items-center justify-between px-2 text-sm font-semibold text-[#E8712E]">
+                {tabs.map((t) => (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setActiveTab(t.key)}
+                    className={`relative pb-5 transition ${
+                      t.key === activeTab
+                        ? "text-[#E8712E]"
+                        : "text-[#E8712E]/70"
+                    }`}
+                  >
+                    {t.label}
+                    {t.key === activeTab && (
+                      <span className="absolute left-0 bottom-[1px] h-[3px] w-12 bg-[#E54B2D]" />
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div className="absolute left-0 right-0 bottom-0 h-[2px] bg-[#2d2d2d]/70" />
             </div>
-            <div className="h-[2px] w-full bg-[#2d2d2d]/70" />
           </div>
 
-          <div className="mt-32 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-12 gap-y-28">
-            {filtered.map((d) => (
-              <DishCard key={d.id} dish={d} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="mt-16 text-sm text-gray-500">
+              Đang tải dữ liệu...
+            </div>
+          ) : error ? (
+            <div className="mt-16 text-sm text-red-500">{error}</div>
+          ) : filtered.length === 0 ? (
+            <div className="mt-16 text-sm text-gray-500">
+              Không có món ăn phù hợp.
+            </div>
+          ) : (
+            <div className="mt-32 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-12 gap-y-28">
+              {filtered.map((dish) => (
+                <DishCard key={dish.dishId} dish={dish} />
+              ))}
+            </div>
+          )}
         </main>
       </div>
     </div>
@@ -184,13 +205,15 @@ export default function OwnerFood() {
 }
 
 function DishCard({ dish }) {
+  const imgSrc = getImageUrl(dish.img);
+
   return (
-    <div className="relative bg-white rounded-2xl border border-[#F1F2F6] shadow-[0_10px_22px_rgba(0,0,0,0.12)] overflow-visible">
+    <div className="relative bg-white rounded-2xl border border-[#F1F2F6] shadow-[0_10px_22px_rgba(0,0,0,0.12)] overflow-visible min-h-[320px]">
       <div className="absolute left-1/2 -top-[64px] -translate-x-1/2">
         <div className="h-[190px] w-[190px] rounded-full shadow-[0_18px_36px_rgba(0,0,0,0.22)] overflow-hidden bg-white">
           <img
-            src={dish.img}
-            alt={dish.name}
+            src={imgSrc}
+            alt={dish.dishName}
             className="h-full w-full object-cover"
           />
         </div>
@@ -198,21 +221,38 @@ function DishCard({ dish }) {
 
       <div className="pt-[138px] pb-8 px-8 text-center">
         <div className="text-[15px] font-semibold text-gray-900">
-          {dish.name}
+          {dish.dishName || "Không có tên"}
         </div>
 
         <div className="mt-2 text-[12px] font-bold text-[#E54B2D]">
-          {dish.price}
+          {formatPrice(dish.price)}
         </div>
 
-        <div className="mt-5 text-[11px] text-[#E54B2D] whitespace-pre-line leading-relaxed">
-          {dish.note}
+        <div className="mt-5 text-[11px] text-[#E54B2D] whitespace-pre-line leading-relaxed min-h-[44px]">
+          {dish.note || "Không có ghi chú"}
         </div>
 
         <div className="mt-6 text-[10px] text-gray-500 whitespace-pre-line leading-relaxed">
-          {dish.ingredients}
+          {dish.description || "Không có mô tả"}
         </div>
       </div>
     </div>
   );
+}
+
+function formatPrice(price) {
+  const value = Number(price || 0);
+  return `${value.toLocaleString("vi-VN")} VNĐ`;
+}
+
+function getImageUrl(img) {
+  if (!img) {
+    return "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=800&q=70";
+  }
+
+  if (img.startsWith("http://") || img.startsWith("https://")) {
+    return img;
+  }
+
+  return `${API_URL}${img}`;
 }
