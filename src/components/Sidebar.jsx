@@ -62,7 +62,7 @@ export default function Sidebar({ onExpandChange }) {
       ${expanded ? "w-72" : "w-20"}`}
     >
       {/* LOGO */}
-      <div className="h-20 flex items-center justify-center border-b">
+      <div className="h-20 flex items-center justify-center ">
         <div className="font-logo text-[#E8712E] tracking-wide">
           {expanded ? (
             <span className="text-4xl">BOOKFET</span>
