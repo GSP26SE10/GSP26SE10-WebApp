@@ -12,6 +12,7 @@ import {
   Pencil,
 } from "lucide-react";
 import API_URL from "@/config/api";
+import Topbar from "@/components/Topbar";
 
 export default function OwnerDish() {
   const [sbExpanded, setSbExpanded] = React.useState(false);
@@ -452,47 +453,19 @@ export default function OwnerDish() {
           sbExpanded ? "ml-72" : "ml-20"
         }`}
       >
-        <header className="sticky top-0 z-10 bg-white border-b">
-          <div className="h-16 px-7 flex items-center justify-between">
-            <div className="text-sm font-semibold tracking-wide">
+        <Topbar
+          breadcrumb={
+            <>
               <span className="text-gray-400">QUẢN LÝ</span>
               <span className="text-gray-400 mx-2">/</span>
               <span className="text-gray-900">MÓN ĂN</span>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="hidden md:flex items-center gap-2 bg-[#F6F7FB] border border-[#EEF0F6] rounded-full px-4 py-2 w-[360px]">
-                <Search className="h-4 w-4 text-gray-400" />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="bg-transparent outline-none text-sm w-full text-gray-700 placeholder:text-gray-400"
-                  placeholder="Tìm"
-                />
-              </div>
-
-              <button className="p-2 rounded-full hover:bg-gray-100">
-                <Mail className="h-5 w-5 text-gray-600" />
-              </button>
-
-              <button className="p-2 rounded-full hover:bg-gray-100 relative">
-                <Bell className="h-5 w-5 text-gray-600" />
-                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500" />
-              </button>
-
-              <div className="flex items-center gap-2">
-                <img
-                  src="https://gocnhobecon.com/wp-content/uploads/2025/08/meme-con-meo-cuoi.webp"
-                  alt="avatar"
-                  className="h-9 w-9 rounded-full object-cover"
-                />
-                <button className="hidden md:inline-flex items-center gap-1 text-sm text-gray-700">
-                  <ChevronDown className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </header>
+            </>
+          }
+          showSearch
+          searchValue={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Tìm món ăn"
+        />
 
         <main className="px-7 py-6 pb-10">
           <div className="flex items-center justify-end gap-3 mb-6">

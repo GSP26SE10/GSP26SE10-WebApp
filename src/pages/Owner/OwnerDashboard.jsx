@@ -10,6 +10,7 @@ import {
   DollarSign,
   XCircle,
 } from "lucide-react";
+import Topbar from "@/components/Topbar";
 
 export default function OwnerDashboard() {
   const stats = [
@@ -68,46 +69,11 @@ export default function OwnerDashboard() {
           sbExpanded ? "ml-72" : "ml-20"
         }`}
       >
-        {/* TOP BAR */}
-        <header className="sticky top-0 z-10 bg-white">
-          <div className="h-16 px-7 flex items-center justify-between">
-            <h2 className="text-lg font-semibold tracking-wide text-[#1f2937]">
-              TỔNG QUAN
-            </h2>
-
-            <div className="flex items-center gap-4">
-              {/* Search */}
-              <div className="hidden md:flex items-center gap-2 bg-[#F6F7FB] border border-[#EEF0F6] rounded-full px-4 py-2 w-[360px]">
-                <Search className="h-4 w-4 text-gray-400" />
-                <input
-                  className="bg-transparent outline-none text-sm w-full text-gray-700 placeholder:text-gray-400"
-                  placeholder="Tìm"
-                />
-              </div>
-
-              {/* Icons */}
-              <button className="p-2 rounded-full hover:bg-gray-100">
-                <Mail className="h-5 w-5 text-gray-600" />
-              </button>
-              <button className="p-2 rounded-full hover:bg-gray-100 relative">
-                <Bell className="h-5 w-5 text-gray-600" />
-                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500" />
-              </button>
-
-              {/* Avatar */}
-              <div className="flex items-center gap-2">
-                <img
-                  src="https://gocnhobecon.com/wp-content/uploads/2025/08/meme-con-meo-cuoi.webp"
-                  alt="avatar"
-                  className="h-9 w-9 rounded-full object-cover"
-                />
-                <button className="hidden md:inline-flex items-center gap-1 text-sm text-gray-700">
-                  <ChevronDown className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </header>
+        <Topbar
+          title="TỔNG QUAN"
+          showSearch={false}
+          avatarSrc="https://gocnhobecon.com/wp-content/uploads/2025/08/meme-con-meo-cuoi.webp"
+        />
 
         {/* CONTENT */}
         <main className="px-7 py-6">
