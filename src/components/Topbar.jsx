@@ -10,6 +10,8 @@ export default function Topbar({
   searchPlaceholder = "Tìm",
   actions,
   avatarSrc = "https://gocnhobecon.com/wp-content/uploads/2025/08/meme-con-meo-cuoi.webp",
+  onMailClick,
+  unreadCount = 0,
 }) {
   return (
     <header className="sticky top-0 z-10 bg-white border-b">
@@ -43,8 +45,17 @@ export default function Topbar({
             </div>
           )}
 
-          <button className="p-2 rounded-full hover:bg-gray-100">
+          <button
+            type="button"
+            onClick={onMailClick}
+            className="p-2 rounded-full hover:bg-gray-100 relative"
+          >
             <Mail className="h-5 w-5 text-gray-600" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-[#E8712E] text-white text-[10px] flex items-center justify-center px-1">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
           </button>
 
           <button className="p-2 rounded-full hover:bg-gray-100 relative">

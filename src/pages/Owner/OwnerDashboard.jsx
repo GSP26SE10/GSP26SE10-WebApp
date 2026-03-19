@@ -11,8 +11,10 @@ import {
   XCircle,
 } from "lucide-react";
 import Topbar from "@/components/Topbar";
+import ChatPanel from "@/components/ChatPanel";
 
 export default function OwnerDashboard() {
+  const [openChat, setOpenChat] = React.useState(false);
   const stats = [
     {
       title: "Chờ duyệt",
@@ -73,6 +75,7 @@ export default function OwnerDashboard() {
           title="TỔNG QUAN"
           showSearch={false}
           avatarSrc="https://gocnhobecon.com/wp-content/uploads/2025/08/meme-con-meo-cuoi.webp"
+          onMailClick={() => setOpenChat(true)}
         />
 
         {/* CONTENT */}
@@ -162,6 +165,7 @@ export default function OwnerDashboard() {
           </section>
         </main>
       </div>
+      <ChatPanel open={openChat} onClose={() => setOpenChat(false)} />
     </div>
   );
 }

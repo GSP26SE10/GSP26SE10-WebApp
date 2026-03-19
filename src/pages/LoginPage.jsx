@@ -14,6 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Lock, User } from "lucide-react";
 import API_URL from "@/config/api";
 import { useNavigate } from "react-router-dom";
+import { hubConnection } from "@/signalr/connection";
 
 export default function LoginPage() {
   const [identifier, setIdentifier] = React.useState("");
@@ -62,36 +63,35 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const url = `${API_URL}/api/authentication/login`;
-
-      const body = {
-        userNameOrEmail: identifier.trim(),
-        password,
-      };
-
-      const res = await fetch(url, {
+      const res = await fetch(`${API_URL}/api/authentication/login`, {
         method: "POST",
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
         },
         mode: "cors",
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          userNameOrEmail: identifier.trim(),
+          password,
+        }),
       });
 
       const data = await safeParse(res);
 
       if (!res.ok) {
-        const msg =
+        throw new Error(
           data?.message ||
-          data?.error ||
-          data?.title ||
-          data?.raw ||
-          `HTTP ${res.status}`;
-        throw new Error(msg);
+            data?.error ||
+            data?.title ||
+            data?.raw ||
+            `HTTP ${res.status}`,
+        );
       }
 
       const token = extractToken(data);
+      if (!token) {
+        throw new Error("Không lấy được access token.");
+      }
 
       const storage = remember ? localStorage : sessionStorage;
       storage.setItem("accessToken", token);
@@ -101,12 +101,20 @@ export default function LoginPage() {
       );
 
       if (data?.data?.user || data?.user) {
-        const user = data?.data?.user ?? data?.user;
-        storage.setItem("userProfile", JSON.stringify(user));
+        storage.setItem(
+          "userProfile",
+          JSON.stringify(data?.data?.user ?? data?.user),
+        );
+      }
+
+      if (hubConnection.state === "Disconnected") {
+        await hubConnection.start();
+        console.log("chatHub connected:", hubConnection.connectionId);
       }
 
       navigate("/owner/dashboard");
     } catch (err) {
+      console.error(err);
       setError(err?.message || "Đăng nhập thất bại. Vui lòng thử lại.");
     } finally {
       setIsLoading(false);
@@ -167,7 +175,6 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     className="pl-10 pr-24"
                   />
-
                   <Button
                     type="button"
                     variant="ghost"
@@ -223,11 +230,6 @@ export default function LoginPage() {
             </div>
           </CardFooter>
         </Card>
-
-        <p className="mt-6 text-center text-xs text-muted-foreground">
-          Bằng việc đăng nhập, bạn đồng ý với Điều khoản & Chính sách của chúng
-          tôi.
-        </p>
       </div>
     </div>
   );

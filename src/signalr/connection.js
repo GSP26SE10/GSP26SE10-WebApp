@@ -35,7 +35,9 @@ export async function startSignalRConnection() {
 
 export async function joinConversation(conversationId) {
   if (!conversationId) return;
-  await hubConnection.invoke("JoinConversation", conversationId);
+
+  await startSignalRConnection();
+  return await hubConnection.invoke("JoinConversation", String(conversationId));
 }
 
 export function onReceiveMessage(callback) {
