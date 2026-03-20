@@ -1,2 +1,3 @@
-const API_URL = "https://gsp26se10-be.fly.dev";
+//const API_URL = "https://gsp26se10-be.fly.dev";
+const API_URL = "https://programmer-ips-sixth-surgical.trycloudflare.com";
 export default API_URL;

@@ -1,24 +1,83 @@
 import React from "react";
 import Sidebar from "@/components/Sidebar";
-import {
-  Search,
-  Mail,
-  Bell,
-  ChevronDown,
-  Package,
-  CheckCircle2,
-  DollarSign,
-  XCircle,
-} from "lucide-react";
+import { Package, CheckCircle2, DollarSign, XCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import API_URL from "@/config/api";
 import Topbar from "@/components/Topbar";
 import ChatPanel from "@/components/ChatPanel";
 
 export default function OwnerDashboard() {
   const [openChat, setOpenChat] = React.useState(false);
+  const [sbExpanded, setSbExpanded] = React.useState(false);
+
+  const [orders, setOrders] = React.useState([]);
+  const [loadingOrders, setLoadingOrders] = React.useState(true);
+  const [orderError, setOrderError] = React.useState("");
+
+  const navigate = useNavigate();
+
+  const fetchOrders = React.useCallback(async () => {
+    setLoadingOrders(true);
+    setOrderError("");
+
+    try {
+      const token =
+        localStorage.getItem("accessToken") ||
+        sessionStorage.getItem("accessToken");
+
+      const res = await fetch(`${API_URL}/api/order?page=1&pageSize=20`, {
+        headers: {
+          accept: "*/*",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Không thể tải danh sách đơn hàng");
+      }
+
+      setOrders(Array.isArray(data?.items) ? data.items : []);
+    } catch (err) {
+      setOrderError(err.message || "Đã có lỗi xảy ra");
+    } finally {
+      setLoadingOrders(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  const pendingOrders = orders
+    .filter((order) => Number(order.status) === 1)
+    .map((order) => {
+      const detail = order.orderDetails?.[0];
+
+      return {
+        orderId: order.orderId,
+        id: `#${order.orderId}`,
+        time: formatDateTime(detail?.startTime || order.createdAt),
+        customer: order.customerName || "--",
+        location: detail?.address || "--",
+        menu: detail?.menuName || "--",
+        totalPrice: order.totalPrice || 0,
+      };
+    });
+
+  const pendingCount = orders.filter((x) => Number(x.status) === 1).length;
+  const completedCount = orders.filter((x) => Number(x.status) === 2).length;
+  const cancelledCount = orders.filter((x) => Number(x.status) === 0).length;
+  const totalRevenue = orders.reduce(
+    (sum, x) => sum + Number(x.totalPrice || 0),
+    0,
+  );
+
   const stats = [
     {
       title: "Chờ duyệt",
-      value: 10,
+      value: pendingCount,
       icon: <Package className="h-5 w-5" />,
       color: "#19ACA0",
       badge: "+ 8.56%",
@@ -27,7 +86,7 @@ export default function OwnerDashboard() {
     },
     {
       title: "Hoàn thành",
-      value: 567,
+      value: completedCount,
       icon: <CheckCircle2 className="h-5 w-5" />,
       color: "#1F982A",
       badge: "+ 9.6%",
@@ -36,7 +95,7 @@ export default function OwnerDashboard() {
     },
     {
       title: "Doanh thu",
-      value: "123,123,123",
+      value: formatCompactPrice(totalRevenue),
       icon: <DollarSign className="h-5 w-5" />,
       color: "#3B82F6",
       badge: "- 9.6%",
@@ -45,7 +104,7 @@ export default function OwnerDashboard() {
     },
     {
       title: "Đơn hủy",
-      value: 125,
+      value: cancelledCount,
       icon: <XCircle className="h-5 w-5" />,
       color: "#DE4444",
       badge: "+ 12.3%",
@@ -54,14 +113,6 @@ export default function OwnerDashboard() {
     },
   ];
 
-  const pendingOrders = Array.from({ length: 6 }).map(() => ({
-    id: "#4546563",
-    time: "26 tháng 3 2020, 12:42 Sáng",
-    customer: "Roberto Carlo",
-    location: "ĐH FPT HCM",
-    menu: "10.000.000 VNĐ",
-  }));
-  const [sbExpanded, setSbExpanded] = React.useState(false);
   return (
     <div className="min-h-screen bg-[#FFFAF0] font-main">
       <Sidebar onExpandChange={setSbExpanded} />
@@ -78,9 +129,7 @@ export default function OwnerDashboard() {
           onMailClick={() => setOpenChat(true)}
         />
 
-        {/* CONTENT */}
         <main className="px-7 py-6">
-          {/* Tabs */}
           <div className="flex justify-end mb-6">
             <div className="inline-flex bg-white rounded-lg p-1 gap-1 border border-[#F2B9A5]">
               <Tab label="Hôm nay" />
@@ -89,14 +138,12 @@ export default function OwnerDashboard() {
             </div>
           </div>
 
-          {/* Stat cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
             {stats.map((s) => (
               <StatCard key={s.title} {...s} />
             ))}
           </div>
 
-          {/* Revenue chart */}
           <section className="mt-6 bg-white rounded-xl border border-[#F1F2F6] p-6">
             <div className="flex items-start justify-between">
               <div>
@@ -109,7 +156,7 @@ export default function OwnerDashboard() {
                   <div className="text-gray-500 leading-tight">
                     <div className="text-xs">Tổng</div>
                     <div className="text-gray-900 font-semibold text-xs">
-                      41,512M
+                      {formatPrice(totalRevenue)}
                     </div>
                   </div>
                 </div>
@@ -121,11 +168,18 @@ export default function OwnerDashboard() {
             </div>
           </section>
 
-          {/* Pending orders */}
           <section className="mt-8">
-            <h3 className="text-[#E8712E] font-bold mb-4">
-              Đơn hàng chờ duyệt
-            </h3>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-[#E8712E] font-bold">Đơn hàng chờ duyệt</h3>
+
+              <button
+                type="button"
+                onClick={() => navigate("/owner/orders")}
+                className="rounded-lg border border-[#F2B9A5] px-4 py-2 text-sm font-semibold text-[#E8712E] hover:bg-[#FFF3EA]"
+              >
+                Xem tất cả
+              </button>
+            </div>
 
             <div className="bg-white rounded-xl border border-[#F1F2F6] overflow-hidden">
               <div className="overflow-x-auto">
@@ -141,23 +195,58 @@ export default function OwnerDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {pendingOrders.map((o, idx) => (
-                      <tr
-                        key={idx}
-                        className="border-b last:border-b-0 border-[#F1F2F6] text-gray-700 hover:bg-[#FBFBFD]"
-                      >
-                        <td className="px-6 py-5">{o.id}</td>
-                        <td className="px-6 py-5">{o.time}</td>
-                        <td className="px-6 py-5">{o.customer}</td>
-                        <td className="px-6 py-5">{o.location}</td>
-                        <td className="px-6 py-5">{o.menu}</td>
-                        <td className="px-6 py-5">
-                          <button className="px-3 py-1 rounded-md hover:bg-gray-100">
-                            •••
-                          </button>
+                    {loadingOrders ? (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="px-6 py-6 text-sm text-gray-500"
+                        >
+                          Đang tải đơn hàng...
                         </td>
                       </tr>
-                    ))}
+                    ) : orderError ? (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="px-6 py-6 text-sm text-red-500"
+                        >
+                          {orderError}
+                        </td>
+                      </tr>
+                    ) : pendingOrders.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="px-6 py-6 text-sm text-gray-500"
+                        >
+                          Không có đơn hàng chờ duyệt.
+                        </td>
+                      </tr>
+                    ) : (
+                      pendingOrders.slice(0, 6).map((o) => (
+                        <tr
+                          key={o.orderId}
+                          className="border-b last:border-b-0 border-[#F1F2F6] text-gray-700 hover:bg-[#FBFBFD]"
+                        >
+                          <td className="px-6 py-5">{o.id}</td>
+                          <td className="px-6 py-5">{o.time}</td>
+                          <td className="px-6 py-5">{o.customer}</td>
+                          <td className="px-6 py-5">{o.location}</td>
+                          <td className="px-6 py-5">{o.menu}</td>
+                          <td className="px-6 py-5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                navigate(`/owner/orders/${o.orderId}`)
+                              }
+                              className="rounded-md px-3 py-1 hover:bg-gray-100"
+                            >
+                              •••
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -165,6 +254,7 @@ export default function OwnerDashboard() {
           </section>
         </main>
       </div>
+
       <ChatPanel open={openChat} onClose={() => setOpenChat(false)} />
     </div>
   );
@@ -174,10 +264,9 @@ function Tab({ label, active }) {
   return (
     <button
       type="button"
-      className={`px-4 py-2 rounded-md text-sm transition font-medium
-        ${
-          active ? "bg-[#E8712E] text-white" : "text-gray-700 hover:bg-gray-100"
-        }`}
+      className={`px-4 py-2 rounded-md text-sm transition font-medium ${
+        active ? "bg-[#E8712E] text-white" : "text-gray-700 hover:bg-gray-100"
+      }`}
     >
       {label}
     </button>
@@ -187,11 +276,11 @@ function Tab({ label, active }) {
 function StatCard({ title, value, icon, color, badge, badgeUp, active }) {
   return (
     <div
-      className={`bg-white rounded-xl border border-[#F1F2F6] px-6 py-5 flex items-center justify-between
-        ${active ? "ring-2 ring-[#3b82f6]" : ""}`}
+      className={`bg-white rounded-xl border border-[#F1F2F6] px-6 py-5 flex items-center justify-between ${
+        active ? "ring-2 ring-[#3b82f6]" : ""
+      }`}
     >
       <div className="flex items-center gap-4">
-        {/* icon circle */}
         <div
           className="h-11 w-11 rounded-full flex items-center justify-center"
           style={{
@@ -229,7 +318,6 @@ function AreaChartMock() {
           preserveAspectRatio="none"
           className="w-full h-full"
         >
-          {/* grid */}
           {[40, 90, 140, 190, 240].map((y, i) => (
             <line
               key={i}
@@ -249,7 +337,6 @@ function AreaChartMock() {
             </linearGradient>
           </defs>
 
-          {/* line */}
           <path
             d="M 0 220
                C 120 70, 240 40, 320 90
@@ -261,7 +348,6 @@ function AreaChartMock() {
             strokeWidth="5"
           />
 
-          {/* area */}
           <path
             d="M 0 260
                L 0 220
@@ -275,7 +361,6 @@ function AreaChartMock() {
           />
         </svg>
 
-        {/* x labels */}
         <div className="absolute bottom-0 left-0 right-0 flex justify-between px-2 text-xs text-[#94A3B8]">
           {[
             "Jan",
@@ -299,7 +384,6 @@ function AreaChartMock() {
   );
 }
 
-/* helper */
 function hexToRgba(hex, alpha = 1) {
   const h = hex.replace("#", "");
   const bigint = parseInt(h, 16);
@@ -307,4 +391,26 @@ function hexToRgba(hex, alpha = 1) {
   const g = (bigint >> 8) & 255;
   const b = bigint & 255;
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function formatPrice(price) {
+  return `${Number(price || 0).toLocaleString("vi-VN")} VNĐ`;
+}
+
+function formatCompactPrice(price) {
+  return Number(price || 0).toLocaleString("vi-VN");
+}
+
+function formatDateTime(dateString) {
+  if (!dateString) return "--";
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return "--";
+
+  return date.toLocaleString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }

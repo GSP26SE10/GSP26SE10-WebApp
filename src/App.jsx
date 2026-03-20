@@ -13,6 +13,8 @@ import OwnerMenu from "@/pages/Owner/OwnerMenu";
 import OwnerDish from "@/pages/Owner/OwnerDish";
 import OwnerDishCategory from "@/pages/Owner/OwnerDishCategory";
 import OwnerService from "@/pages/Owner/OwnerService";
+import OwnerPendingOrders from "@/pages/Owner/OwnerPendingOrders";
+import OwnerTrackingOrder from "./pages/Owner/OwnerTrackingOrder";
 export default function App() {
   return (
     <Router>
@@ -27,6 +29,8 @@ export default function App() {
               <Route path="dish" element={<OwnerDish />} />
               <Route path="dish-category" element={<OwnerDishCategory />} />
               <Route path="service" element={<OwnerService />} />
+              <Route path="orders/pending" element={<OwnerPendingOrders />} />
+              <Route path="orders/tracking" element={<OwnerTrackingOrder />} />
             </Route>
           </Routes>
           <Toaster />

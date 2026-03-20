@@ -141,13 +141,13 @@ export default function Sidebar({ onExpandChange }) {
           forceActive={isOrdersActive}
         >
           <SubItemLink
-            to="/owner/orders"
+            to="/owner/orders/pending"
             expanded={expanded}
             icon={<ClipboardList className="h-4 w-4" />}
             label="Quản lí đơn hàng"
           />
           <SubItemLink
-            to="/owner/tracking"
+            to="/owner/orders/tracking"
             expanded={expanded}
             icon={<Search className="h-4 w-4" />}
             label="Tra cứu"
