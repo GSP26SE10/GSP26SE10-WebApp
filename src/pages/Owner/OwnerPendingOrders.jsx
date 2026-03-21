@@ -230,8 +230,8 @@ export default function OwnerPendingOrder() {
             ))}
           </div>
 
-          <div className="mt-6 grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6 items-start">
-            <section>
+          <div className="mt-6 grid grid-cols-1 xl:grid-cols-[360px_minmax(0,1fr)] gap-6 items-start xl:h-[calc(100vh-220px)]">
+            <section className="min-h-0 xl:h-full flex flex-col">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-[28px] font-bold text-[#2F3A67]">Tất cả</h2>
 
@@ -244,7 +244,7 @@ export default function OwnerPendingOrder() {
                 </button>
               </div>
 
-              <div className="space-y-4">
+              <div className="flex-1 min-h-0 overflow-y-auto hide-scrollbar space-y-4 pr-1">
                 {loading ? (
                   <div className="rounded-2xl bg-white p-5 text-sm text-gray-500">
                     Đang tải đơn hàng...
@@ -351,7 +351,7 @@ export default function OwnerPendingOrder() {
               </div>
             </section>
 
-            <section>
+            <section className="min-h-0 xl:h-full overflow-y-auto hide-scrollbar pr-1">
               {!selectedOrder ? (
                 <div className="rounded-2xl bg-white p-6 text-sm text-gray-500">
                   Chọn một đơn hàng để xem chi tiết.

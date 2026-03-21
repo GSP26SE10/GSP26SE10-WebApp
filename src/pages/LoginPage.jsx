@@ -107,10 +107,10 @@ export default function LoginPage() {
         );
       }
 
-      // if (hubConnection.state === "Disconnected") {
-      //   await hubConnection.start();
-      //   console.log("chatHub connected:", hubConnection.connectionId);
-      // }
+      if (hubConnection.state === "Disconnected") {
+        await hubConnection.start();
+        console.log("chatHub connected:", hubConnection.connectionId);
+      }
 
       navigate("/owner/dashboard");
     } catch (err) {

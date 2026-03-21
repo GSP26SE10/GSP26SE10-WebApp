@@ -66,7 +66,7 @@ export default function OwnerDishCategory() {
             <>
               <span className="text-gray-400">QUẢN LÝ</span>
               <span className="text-gray-400 mx-2">/</span>
-              <span className="text-gray-900">DANH MỤC</span>
+              <span className="text-gray-900">DANH MỤC MÓN ĂN</span>
             </>
           }
           showSearch

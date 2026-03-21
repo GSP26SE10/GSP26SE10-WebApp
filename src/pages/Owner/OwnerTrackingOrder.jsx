@@ -34,7 +34,6 @@ export default function OwnerTrackingOrder() {
   const [selectedStaffGroupId, setSelectedStaffGroupId] = React.useState("");
   const [assigning, setAssigning] = React.useState(false);
   const [message, setMessage] = React.useState("");
-
   const token =
     localStorage.getItem("accessToken") ||
     sessionStorage.getItem("accessToken");
@@ -181,7 +180,7 @@ export default function OwnerTrackingOrder() {
   const handleAssignStaffGroup = async () => {
     if (!selectedOrder) return;
 
-    if (Number(selectedOrder.status) < 2) {
+    if (Number(selectedOrder.status) !== 2) {
       setError("Chỉ gán nhóm cho đơn đã được duyệt.");
       return;
     }
@@ -275,8 +274,8 @@ export default function OwnerTrackingOrder() {
             ))}
           </div>
 
-          <div className="mt-6 grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6 items-start">
-            <section>
+          <div className="mt-6 grid grid-cols-1 xl:grid-cols-[360px_minmax(0,1fr)] gap-6 xl:h-[calc(100vh-220px)] items-start">
+            <section className="min-h-0 xl:h-full flex flex-col">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-[28px] font-bold text-[#2F3A67]">Tất cả</h2>
 
@@ -289,7 +288,7 @@ export default function OwnerTrackingOrder() {
                 </button>
               </div>
 
-              <div className="space-y-4">
+              <div className="flex-1 min-h-0 overflow-y-auto hide-scrollbar space-y-4 pr-1">
                 {loading ? (
                   <div className="rounded-2xl bg-white p-5 text-sm text-gray-500">
                     Đang tải đơn hàng...
@@ -396,7 +395,7 @@ export default function OwnerTrackingOrder() {
               </div>
             </section>
 
-            <section>
+            <section className="min-h-0 xl:h-full overflow-y-auto hide-scrollbar pr-1">
               {!selectedOrder ? (
                 <div className="rounded-2xl bg-white p-6 text-sm text-gray-500">
                   Chọn một đơn hàng để xem chi tiết.
@@ -440,7 +439,7 @@ function OrderDetailPanel({
   const serviceSnapshot = detail?.serviceSnapshot;
   const firstImage = getFirstImage(menuSnapshot?.imgUrl);
   const mapSrc = getGoogleMapEmbedUrl(detail?.address);
-
+  const canAssignStaffGroup = Number(order.status) === 2;
   return (
     <div className="space-y-5">
       <div className="rounded-2xl bg-white p-5">
@@ -475,15 +474,17 @@ function OrderDetailPanel({
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-[30px] font-bold text-[#2F3A67]">Chi Tiết</h3>
 
-          <button
-            type="button"
-            onClick={onAssign}
-            disabled={assigning}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#2F3A67] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
-          >
-            <Save className="h-4 w-4" />
-            {assigning ? "Đang gán..." : "Gán nhóm phụ trách"}
-          </button>
+          {canAssignStaffGroup ? (
+            <button
+              type="button"
+              onClick={onAssign}
+              disabled={assigning}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#2F3A67] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+            >
+              <Save className="h-4 w-4" />
+              {assigning ? "Đang gán..." : "Gán nhóm phụ trách"}
+            </button>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr] gap-5">
@@ -687,27 +688,29 @@ function OrderDetailPanel({
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white p-5">
-              <div className="text-lg font-semibold text-[#2F3A67] mb-3">
-                Nhóm phụ trách
-              </div>
+            {canAssignStaffGroup ? (
+              <div className="rounded-2xl bg-white p-5">
+                <div className="text-lg font-semibold text-[#2F3A67] mb-3">
+                  Nhóm phụ trách
+                </div>
 
-              <select
-                value={selectedStaffGroupId}
-                onChange={(e) => setSelectedStaffGroupId(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 bg-[#F8F5F1] px-4 py-3 text-sm outline-none"
-              >
-                <option value="">
-                  {loadingStaffGroups ? "Đang tải nhóm..." : "Chưa phân công"}
-                </option>
-                {staffGroups.map((group) => (
-                  <option key={group.staffGroupId} value={group.staffGroupId}>
-                    {group.staffGroupName}
-                    {group.leaderName ? ` - ${group.leaderName}` : ""}
+                <select
+                  value={selectedStaffGroupId}
+                  onChange={(e) => setSelectedStaffGroupId(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-[#F8F5F1] px-4 py-3 text-sm outline-none"
+                >
+                  <option value="">
+                    {loadingStaffGroups ? "Đang tải nhóm..." : "Chưa phân công"}
                   </option>
-                ))}
-              </select>
-            </div>
+                  {staffGroups.map((group) => (
+                    <option key={group.staffGroupId} value={group.staffGroupId}>
+                      {group.staffGroupName}
+                      {group.leaderName ? ` - ${group.leaderName}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

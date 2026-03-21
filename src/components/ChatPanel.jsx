@@ -78,12 +78,14 @@ export default function ChatPanel({ open, onClose }) {
       if (!conversationId) return;
 
       setLoadingMessages(true);
-      setError("");
 
       try {
-        const res = await fetch(`${API_URL}/api/message`, {
-          headers: authHeaders,
-        });
+        const res = await fetch(
+          `${API_URL}/api/message?conversationId=${conversationId}&page=1&pageSize=100`,
+          {
+            headers: authHeaders,
+          },
+        );
 
         const data = await safeJson(res);
 
@@ -91,14 +93,10 @@ export default function ChatPanel({ open, onClose }) {
           throw new Error(data?.message || "Không thể tải tin nhắn");
         }
 
-        const allItems = Array.isArray(data?.items) ? data.items : [];
-        const filtered = allItems
-          .filter(
-            (item) => Number(item.conversationId) === Number(conversationId),
-          )
-          .sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt));
-
-        setMessages(filtered);
+        const items = Array.isArray(data?.items) ? data.items : [];
+        setMessages(
+          items.sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt)),
+        );
       } catch (err) {
         setError(err.message || "Không thể tải tin nhắn");
       } finally {

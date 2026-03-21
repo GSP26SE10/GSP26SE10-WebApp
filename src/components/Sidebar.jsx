@@ -109,7 +109,7 @@ export default function Sidebar({ onExpandChange }) {
             to="/owner/dish-category"
             expanded={expanded}
             icon={<Folder className="h-4 w-4" />}
-            label="Danh mục"
+            label="Danh mục món ăn"
           />
           <SubItemLink
             to="/owner/service"
@@ -144,7 +144,7 @@ export default function Sidebar({ onExpandChange }) {
             to="/owner/orders/pending"
             expanded={expanded}
             icon={<ClipboardList className="h-4 w-4" />}
-            label="Quản lí đơn hàng"
+            label="Chờ duyệt"
           />
           <SubItemLink
             to="/owner/orders/tracking"
