@@ -4,17 +4,87 @@ import Topbar from "@/components/Topbar";
 import ChatPanel from "@/components/ChatPanel";
 import API_URL from "@/config/api";
 import {
-  BookOpen,
+  ClipboardList,
+  CheckCircle2,
+  XCircle,
   Filter,
   MapPin,
   Phone,
   FileDown,
-  Wallet,
-  Users,
   Check,
   Ban,
+  ChefHat,
+  UtensilsCrossed,
+  Wallet,
+  Users,
   Clock3,
 } from "lucide-react";
+
+const ORDER_STATUS_MAP = {
+  1: {
+    label: "Chờ duyệt",
+    className: "bg-[#FEF3C7] text-[#B45309]",
+  },
+  2: {
+    label: "Đã duyệt",
+    className: "bg-[#DCFCE7] text-[#15803D]",
+  },
+  3: {
+    label: "Từ chối",
+    className: "bg-[#F3F4F6] text-[#6B7280]",
+  },
+  4: {
+    label: "Đang chuẩn bị",
+    className: "bg-[#DBEAFE] text-[#1D4ED8]",
+  },
+  5: {
+    label: "Đang thực hiện",
+    className: "bg-[#E0E7FF] text-[#4338CA]",
+  },
+  6: {
+    label: "Thanh toán",
+    className: "bg-[#EDE9FE] text-[#6D28D9]",
+  },
+  7: {
+    label: "Hoàn thành",
+    className: "bg-[#D1FAE5] text-[#047857]",
+  },
+  8: {
+    label: "Đã hủy",
+    className: "bg-[#FEE2E2] text-[#B91C1C]",
+  },
+};
+
+const ORDER_DETAIL_STATUS_MAP = {
+  1: {
+    label: "Chờ duyệt",
+    className: "bg-[#FEF3C7] text-[#B45309]",
+  },
+  2: {
+    label: "Đã duyệt",
+    className: "bg-[#DCFCE7] text-[#15803D]",
+  },
+  3: {
+    label: "Từ chối",
+    className: "bg-[#F3F4F6] text-[#6B7280]",
+  },
+  4: {
+    label: "Đang chuẩn bị",
+    className: "bg-[#DBEAFE] text-[#1D4ED8]",
+  },
+  5: {
+    label: "Đang thực hiện",
+    className: "bg-[#E0E7FF] text-[#4338CA]",
+  },
+  6: {
+    label: "Hoàn thành",
+    className: "bg-[#D1FAE5] text-[#047857]",
+  },
+  7: {
+    label: "Đã hủy",
+    className: "bg-[#FEE2E2] text-[#B91C1C]",
+  },
+};
 
 export default function OwnerPendingOrder() {
   const [sbExpanded, setSbExpanded] = React.useState(false);
@@ -23,10 +93,10 @@ export default function OwnerPendingOrder() {
   const [orders, setOrders] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
+  const [message, setMessage] = React.useState("");
   const [selectedOrderId, setSelectedOrderId] = React.useState(null);
   const [search, setSearch] = React.useState("");
   const [actionLoading, setActionLoading] = React.useState("");
-  const [message, setMessage] = React.useState("");
 
   const token =
     localStorage.getItem("accessToken") ||
@@ -55,57 +125,67 @@ export default function OwnerPendingOrder() {
 
       setOrders(pendingOnly);
 
-      if (pendingOnly.length > 0 && !selectedOrderId) {
-        setSelectedOrderId(pendingOnly[0].orderId);
+      if (pendingOnly.length > 0) {
+        setSelectedOrderId((prev) => {
+          const exists = pendingOnly.some((item) => item.orderId === prev);
+          return exists ? prev : pendingOnly[0].orderId;
+        });
+      } else {
+        setSelectedOrderId(null);
       }
     } catch (err) {
       setError(err.message || "Đã có lỗi xảy ra");
     } finally {
       setLoading(false);
     }
-  }, [token, selectedOrderId]);
+  }, [token]);
 
   React.useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
 
-  const filteredOrders = orders.filter((order) => {
-    const detail = order.orderDetails?.[0];
+  const filteredOrders = React.useMemo(() => {
     const keyword = search.trim().toLowerCase();
+    if (!keyword) return orders;
 
-    if (!keyword) return true;
+    return orders.filter((order) => {
+      const detail = order.orderDetails?.[0];
 
-    return (
-      String(order.orderId).includes(keyword) ||
-      String(order.customerName || "")
-        .toLowerCase()
-        .includes(keyword) ||
-      String(detail?.address || "")
-        .toLowerCase()
-        .includes(keyword) ||
-      String(detail?.menuName || "")
-        .toLowerCase()
-        .includes(keyword) ||
-      String(detail?.partyCategoryName || "")
-        .toLowerCase()
-        .includes(keyword)
-    );
-  });
+      return (
+        String(order.orderId).includes(keyword) ||
+        String(order.customerName || "")
+          .toLowerCase()
+          .includes(keyword) ||
+        String(detail?.address || "")
+          .toLowerCase()
+          .includes(keyword) ||
+        String(detail?.menuName || "")
+          .toLowerCase()
+          .includes(keyword) ||
+        String(detail?.partyCategoryName || "")
+          .toLowerCase()
+          .includes(keyword)
+      );
+    });
+  }, [orders, search]);
 
   const selectedOrder =
     filteredOrders.find((order) => order.orderId === selectedOrderId) ||
     filteredOrders[0] ||
     null;
 
-  const stats = [
-    {
-      title: "Chờ duyệt",
-      value: orders.length,
-      icon: <BookOpen className="h-5 w-5" />,
-      bg: "bg-cyan-100",
-      text: "text-cyan-600",
-    },
-  ];
+  const stats = React.useMemo(
+    () => [
+      {
+        title: "Chờ duyệt",
+        value: orders.length,
+        icon: <ClipboardList className="h-5 w-5" />,
+        bg: "bg-amber-100",
+        text: "text-amber-600",
+      },
+    ],
+    [orders],
+  );
 
   const handleApproveOrder = async () => {
     if (!selectedOrder) return;
@@ -115,7 +195,7 @@ export default function OwnerPendingOrder() {
     setError("");
 
     try {
-      const reviewRes = await fetch(
+      const res = await fetch(
         `${API_URL}/api/order/${selectedOrder.orderId}/owner/review`,
         {
           method: "PUT",
@@ -128,10 +208,10 @@ export default function OwnerPendingOrder() {
         },
       );
 
-      const reviewData = await reviewRes.json().catch(() => ({}));
+      const data = await res.json().catch(() => ({}));
 
-      if (!reviewRes.ok) {
-        throw new Error(reviewData?.message || "Duyệt đơn thất bại");
+      if (!res.ok) {
+        throw new Error(data?.message || "Duyệt đơn thất bại");
       }
 
       setMessage("Duyệt đơn thành công.");
@@ -193,16 +273,17 @@ export default function OwnerPendingOrder() {
         <Topbar
           breadcrumb={
             <>
-              <span className="text-gray-400">ĐƠN HÀNG</span>
+              <span className="text-gray-400">QUẢN LÝ</span>
               <span className="text-gray-400 mx-2">/</span>
               <span className="text-[#2F3A67] font-bold">
                 ĐƠN HÀNG CHỜ DUYỆT
               </span>
             </>
           }
+          showSearch
           searchValue={search}
           onSearchChange={setSearch}
-          searchPlaceholder="Tìm"
+          searchPlaceholder="Tìm đơn hàng"
           onMailClick={() => setOpenChat(true)}
           avatarSrc="https://gocnhobecon.com/wp-content/uploads/2025/08/meme-con-meo-cuoi.webp"
         />
@@ -228,6 +309,12 @@ export default function OwnerPendingOrder() {
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="mt-8">
+            <h1 className="text-[20px] font-bold text-[#E54B2D]">
+              Tất cả đơn hàng chờ duyệt
+            </h1>
           </div>
 
           <div className="mt-6 grid grid-cols-1 xl:grid-cols-[360px_minmax(0,1fr)] gap-6 items-start xl:h-[calc(100vh-220px)]">
@@ -281,7 +368,7 @@ export default function OwnerPendingOrder() {
                             Đơn hàng #{String(order.orderId).padStart(3, "0")}
                           </div>
 
-                          <StatusBadge status={order.status} />
+                          <StatusBadge type="order" status={order.status} />
                         </div>
 
                         <div className="mt-4 grid grid-cols-[90px_1fr] gap-4 items-start">
@@ -408,7 +495,8 @@ function OrderDetailPanel({
           </div>
 
           <div className="flex items-center gap-3">
-            <StatusBadge status={order.status} />
+            <StatusBadge type="order" status={order.status} />
+
             <button
               type="button"
               className="inline-flex items-center gap-2 rounded-xl border border-[#DCE6F7] px-4 py-2 text-sm text-[#6B8FFB] hover:bg-[#F8FBFF]"
@@ -420,9 +508,31 @@ function OrderDetailPanel({
         </div>
       </div>
 
+      <div className="rounded-2xl bg-white p-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <MiniInfo
+            label="Status Order"
+            value={<StatusBadge type="order" status={order.status} />}
+          />
+          <MiniInfo
+            label="Status OrderDetail"
+            value={<StatusBadge type="orderDetail" status={detail?.status} />}
+          />
+        </div>
+
+        {(message || error) && (
+          <div className="mt-4 rounded-2xl bg-white">
+            {message ? (
+              <div className="text-sm text-green-600">{message}</div>
+            ) : null}
+            {error ? <div className="text-sm text-red-500">{error}</div> : null}
+          </div>
+        )}
+      </div>
+
       <div>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-[30px] font-bold text-[#2F3A67]">Chi Tiết</h3>
+          <h3 className="text-[30px] font-bold text-[#2F3A67]">Chi tiết</h3>
 
           <div className="flex flex-wrap items-center gap-3">
             <button
@@ -474,7 +584,7 @@ function OrderDetailPanel({
                     {detail?.partyCategoryName || "--"}
                   </div>
 
-                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
                     <MiniInfo
                       label="Số khách"
                       value={`${detail?.numberOfGuests || 0} khách`}
@@ -494,46 +604,68 @@ function OrderDetailPanel({
                       value={formatDateTime(detail?.endTime)}
                     />
                   </div>
-
-                  {Array.isArray(menuSnapshot?.dishes) &&
-                  menuSnapshot.dishes.length > 0 ? (
-                    <div className="mt-5">
-                      <div className="text-sm font-semibold text-[#2F3A67] mb-2">
-                        Món trong menu
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        {menuSnapshot.dishes.map((dish) => (
-                          <span
-                            key={dish.dishId}
-                            className="rounded-full bg-[#F8F5F1] px-3 py-2 text-sm text-[#2B2B2B]"
-                          >
-                            {dish.dishName}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
               </div>
             </div>
 
             <div className="rounded-2xl bg-white p-5">
-              <div className="text-lg font-semibold text-[#2F3A67]">
-                Chi tiết đơn hàng
+              <div className="text-lg font-semibold text-[#2F3A67] mb-4">
+                Menu và món trong menu
               </div>
 
-              <div className="mt-4 space-y-2 text-sm">
-                <PriceRow label="Tổng cộng" value={order.totalPrice} />
-                <PriceRow label="Đặt cọc" value={order.depositAmount} />
-                <PriceRow label="Còn lại" value={order.remainingAmount} />
-                <PriceRow
-                  label="Phụ phí"
+              <div className="rounded-xl bg-[#F8F5F1] px-4 py-3 mb-4">
+                <div className="text-sm text-[#8DA1C1]">Tên menu</div>
+                <div className="mt-1 font-semibold text-[#2B2B2B]">
+                  {detail?.menuName || menuSnapshot?.menuName || "--"}
+                </div>
+              </div>
+
+              {Array.isArray(menuSnapshot?.dishes) &&
+              menuSnapshot.dishes.length > 0 ? (
+                <div className="space-y-3">
+                  {menuSnapshot.dishes.map((dish) => (
+                    <div
+                      key={dish.dishId}
+                      className="flex items-center gap-3 rounded-xl bg-[#F8F5F1] px-4 py-3"
+                    >
+                      <div className="h-10 w-10 rounded-full bg-[#FFF1E8] flex items-center justify-center text-[#E8712E]">
+                        <ChefHat className="h-4 w-4" />
+                      </div>
+
+                      <div>
+                        <div className="font-medium text-[#2B2B2B]">
+                          {dish.dishName}
+                        </div>
+                        <div className="text-sm text-[#8DA1C1]">
+                          Mã món: {dish.dishId}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">
+                  Không có món trong menu.
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl bg-white p-5">
+              <div className="text-lg font-semibold text-[#2F3A67] mb-4">
+                Thông tin thanh toán
+              </div>
+
+              <div className="space-y-3">
+                <PaymentRow label="Tổng đơn hàng" value={order.totalPrice} />
+                <PaymentRow label="Đã đặt cọc" value={order.depositAmount} />
+                <PaymentRow label="Còn lại" value={order.remainingAmount} />
+                <PaymentRow
+                  label="Chi phí phát sinh"
                   value={detail?.extraChargeCost || 0}
                 />
               </div>
 
-              <div className="mt-6 flex items-center justify-between border-t pt-4">
+              <div className="mt-6 flex items-center justify-between border-t border-[#EEF2F7] pt-4">
                 <div className="text-lg font-semibold text-[#2F3A67]">
                   Thanh toán
                 </div>
@@ -544,18 +676,18 @@ function OrderDetailPanel({
             </div>
 
             <div className="rounded-2xl bg-white p-5">
-              <div className="text-lg font-semibold text-[#2F3A67]">
+              <div className="text-lg font-semibold text-[#2F3A67] mb-4">
                 Thông tin tiệc
               </div>
 
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-[#2F3A67]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-[#2F3A67]">
                 <InfoBox
                   icon={<Users className="h-4 w-4" />}
                   label="Số khách"
                   value={`${detail?.numberOfGuests || 0} khách`}
                 />
                 <InfoBox
-                  icon={<BookOpen className="h-4 w-4" />}
+                  icon={<UtensilsCrossed className="h-4 w-4" />}
                   label="Loại tiệc"
                   value={detail?.partyCategoryName || "--"}
                 />
@@ -565,7 +697,7 @@ function OrderDetailPanel({
                   value={detail?.menuName || "--"}
                 />
                 <InfoBox
-                  icon={<Clock3Icon />}
+                  icon={<Clock3 className="h-4 w-4" />}
                   label="Thời gian"
                   value={`${formatDateTime(detail?.startTime)} - ${formatTime(
                     detail?.endTime,
@@ -575,14 +707,14 @@ function OrderDetailPanel({
             </div>
 
             <div className="rounded-2xl bg-white p-5">
-              <div className="text-lg font-semibold text-[#2F3A67]">
+              <div className="text-lg font-semibold text-[#2F3A67] mb-4">
                 Dịch vụ đi kèm
               </div>
 
-              <div className="mt-4 space-y-3">
-                {Array.isArray(serviceSnapshot?.services) &&
-                serviceSnapshot.services.length > 0 ? (
-                  serviceSnapshot.services.map((service) => (
+              {Array.isArray(serviceSnapshot?.services) &&
+              serviceSnapshot.services.length > 0 ? (
+                <div className="space-y-3">
+                  {serviceSnapshot.services.map((service) => (
                     <div
                       key={service.serviceId}
                       className="flex items-center justify-between rounded-xl bg-[#F8F5F1] px-4 py-3"
@@ -592,20 +724,20 @@ function OrderDetailPanel({
                           {service.serviceName}
                         </div>
                         <div className="text-sm text-[#8DA1C1]">
-                          SL: {service.quantity || 1}
+                          Số lượng: {service.quantity || 1}
                         </div>
                       </div>
                       <div className="font-semibold text-[#2F3A67]">
                         {formatPrice(service.basePrice)}
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <div className="text-sm text-gray-500">
-                    Không có dịch vụ đi kèm.
-                  </div>
-                )}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">
+                  Không có dịch vụ đi kèm.
+                </div>
+              )}
             </div>
           </div>
 
@@ -642,20 +774,27 @@ function OrderDetailPanel({
 
             <div className="rounded-2xl bg-white p-5">
               <div className="text-lg font-semibold text-[#2F3A67] mb-4">
-                Trạng thái đơn hàng
+                Trạng thái OrderDetail
+              </div>
+
+              <div className="mb-4">
+                <StatusBadge type="orderDetail" status={detail?.status} />
               </div>
 
               <div className="space-y-4">
-                {buildOrderStatusSteps(order.status).map((step, index) => (
-                  <OrderStatusStep
-                    key={step.key}
-                    title={step.title}
-                    active={step.active}
-                    last={
-                      index === buildOrderStatusSteps(order.status).length - 1
-                    }
-                  />
-                ))}
+                {buildOrderDetailStatusSteps(detail?.status).map(
+                  (step, index) => (
+                    <OrderStatusStep
+                      key={step.key}
+                      title={step.title}
+                      active={step.active}
+                      last={
+                        index ===
+                        buildOrderDetailStatusSteps(detail?.status).length - 1
+                      }
+                    />
+                  ),
+                )}
               </div>
             </div>
           </div>
@@ -686,11 +825,11 @@ function MiniInfo({ label, value }) {
   );
 }
 
-function PriceRow({ label, value }) {
+function PaymentRow({ label, value }) {
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-[#8DA1C1]">{label}</span>
-      <span className="font-medium text-[#2B2B2B]">{formatPrice(value)}</span>
+    <div className="flex items-center justify-between rounded-xl bg-[#F8F5F1] px-4 py-3">
+      <span className="text-sm text-[#8DA1C1]">{label}</span>
+      <span className="font-semibold text-[#2B2B2B]">{formatPrice(value)}</span>
     </div>
   );
 }
@@ -708,122 +847,94 @@ function OrderStatusStep({ title, active, last }) {
         >
           {active ? "✓" : "•"}
         </div>
-        {!last && (
+
+        {!last ? (
           <div
-            className={`mt-1 w-[2px] h-8 ${
+            className={`mt-2 h-10 w-[2px] ${
               active ? "bg-[#BFDBFE]" : "bg-[#E5E7EB]"
             }`}
           />
-        )}
+        ) : null}
       </div>
 
-      <div className="pt-1">
-        <div
-          className={`font-medium ${
-            active ? "text-[#2B2B2B]" : "text-[#9CA3AF]"
-          }`}
-        >
-          {title}
-        </div>
+      <div className={`pt-1 ${active ? "text-[#2F3A67]" : "text-[#9CA3AF]"}`}>
+        {title}
       </div>
     </div>
   );
 }
 
-function StatusBadge({ status }) {
-  const configMap = {
-    1: {
-      label: "Chờ duyệt",
-      className: "bg-[#FFF2D9] text-[#D4A038]",
-    },
-    2: {
-      label: "Đã duyệt",
-      className: "bg-[#E8F7E8] text-[#5FB85F]",
-    },
-    3: {
-      label: "Từ chối",
-      className: "bg-[#FDE8E8] text-[#D9534F]",
-    },
-    4: {
-      label: "Đang chuẩn bị",
-      className: "bg-[#E8F1FF] text-[#4C7DDB]",
-    },
-    5: {
-      label: "Đang thực hiện",
-      className: "bg-[#EAF4FF] text-[#3B82F6]",
-    },
-    6: {
-      label: "Thanh toán",
-      className: "bg-[#F3E8FF] text-[#8B5CF6]",
-    },
-    7: {
-      label: "Hoàn thành",
-      className: "bg-[#DCFCE7] text-[#16A34A]",
-    },
-    8: {
-      label: "Đã hủy",
-      className: "bg-[#FEE2E2] text-[#DC2626]",
-    },
-  };
+function StatusBadge({ status, type = "order" }) {
+  const map =
+    type === "orderDetail" ? ORDER_DETAIL_STATUS_MAP : ORDER_STATUS_MAP;
 
-  const config = configMap[Number(status)] || {
-    label: "Không xác định",
-    className: "bg-gray-100 text-gray-500",
+  const item = map[Number(status)] || {
+    label: `Trạng thái ${status}`,
+    className: "bg-[#F3F4F6] text-[#374151]",
   };
 
   return (
     <span
-      className={`inline-flex rounded-lg px-3 py-1 text-xs font-semibold ${config.className}`}
+      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${item.className}`}
     >
-      {config.label}
+      {item.label}
     </span>
   );
 }
 
-function Clock3Icon() {
-  return <Clock3 className="h-4 w-4" />;
-}
+function buildOrderDetailStatusSteps(status) {
+  const value = Number(status);
 
-function buildOrderStatusSteps(currentStatus) {
-  const status = Number(currentStatus);
+  if (value === 3) {
+    return [
+      { key: "pending", title: "Chờ duyệt", active: true },
+      { key: "rejected", title: "Từ chối", active: true },
+    ];
+  }
 
-  const steps = [
-    { key: 1, title: "Chờ duyệt" },
-    { key: 2, title: "Đã duyệt" },
-    { key: 4, title: "Đang chuẩn bị" },
-    { key: 5, title: "Đang thực hiện" },
-    { key: 6, title: "Thanh toán" },
-    { key: 7, title: "Hoàn thành" },
+  if (value === 7) {
+    return [
+      { key: "pending", title: "Chờ duyệt", active: true },
+      { key: "approved", title: "Đã duyệt", active: true },
+      { key: "cancelled", title: "Đã hủy", active: true },
+    ];
+  }
+
+  return [
+    { key: "pending", title: "Chờ duyệt", active: value >= 1 },
+    { key: "approved", title: "Đã duyệt", active: value >= 2 },
+    { key: "preparing", title: "Đang chuẩn bị", active: value >= 4 },
+    { key: "inProgress", title: "Đang thực hiện", active: value >= 5 },
+    { key: "completed", title: "Hoàn thành", active: value >= 6 },
   ];
-
-  if (status === 3) {
-    return [
-      { key: 1, title: "Chờ duyệt", active: true },
-      { key: 3, title: "Từ chối", active: true },
-    ];
-  }
-
-  if (status === 8) {
-    return [
-      { key: 1, title: "Chờ duyệt", active: true },
-      { key: 2, title: "Đã duyệt", active: true },
-      { key: 8, title: "Đã hủy", active: true },
-    ];
-  }
-
-  return steps.map((step) => ({
-    ...step,
-    active: status >= step.key,
-  }));
 }
 
-function formatPrice(price) {
-  return `${Number(price || 0).toLocaleString("vi-VN")} VNĐ`;
+function getFirstImage(imgUrl) {
+  if (Array.isArray(imgUrl) && imgUrl.length > 0) return imgUrl[0];
+  if (typeof imgUrl === "string" && imgUrl.trim()) return imgUrl;
+  return "";
 }
 
-function formatTime(dateString) {
-  if (!dateString) return "--:--";
-  const date = new Date(dateString);
+function getGoogleMapEmbedUrl(address) {
+  if (!address) return "";
+  return `https://www.google.com/maps?q=${encodeURIComponent(address)}&z=15&output=embed`;
+}
+
+function formatPrice(value) {
+  const number = Number(value || 0);
+  return `${number.toLocaleString("vi-VN")} VNĐ`;
+}
+
+function formatDate(value) {
+  if (!value) return "--";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "--";
+  return date.toLocaleDateString("vi-VN");
+}
+
+function formatTime(value) {
+  if (!value) return "--:--";
+  const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "--:--";
   return date.toLocaleTimeString("vi-VN", {
     hour: "2-digit",
@@ -831,18 +942,10 @@ function formatTime(dateString) {
   });
 }
 
-function formatDate(dateString) {
-  if (!dateString) return "--";
-  const date = new Date(dateString);
+function formatDateTime(value) {
+  if (!value) return "--";
+  const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "--";
-  return date.toLocaleDateString("vi-VN");
-}
-
-function formatDateTime(dateString) {
-  if (!dateString) return "--";
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return "--";
-
   return date.toLocaleString("vi-VN", {
     hour: "2-digit",
     minute: "2-digit",
@@ -850,21 +953,4 @@ function formatDateTime(dateString) {
     month: "2-digit",
     year: "numeric",
   });
-}
-
-function getFirstImage(img) {
-  if (Array.isArray(img) && img.length > 0) {
-    return img[0];
-  }
-
-  if (typeof img === "string" && img.trim()) {
-    return img;
-  }
-
-  return "";
-}
-
-function getGoogleMapEmbedUrl(address) {
-  if (!address) return "";
-  return `https://www.google.com/maps?q=${encodeURIComponent(address)}&z=15&output=embed`;
 }

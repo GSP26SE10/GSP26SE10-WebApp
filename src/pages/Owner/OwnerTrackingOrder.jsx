@@ -52,7 +52,7 @@ export default function OwnerTrackingOrder() {
     setError("");
 
     try {
-      const res = await fetch(`${API_URL}/api/order?page=1&pageSize=100`, {
+      const res = await fetch(`${API_URL}/api/order`, {
         headers: {
           accept: "*/*",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -102,15 +102,12 @@ export default function OwnerTrackingOrder() {
     setLoadingStaffGroups(true);
 
     try {
-      const res = await fetch(
-        `${API_URL}/api/staff-group?page=1&pageSize=100`,
-        {
-          headers: {
-            accept: "*/*",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
+      const res = await fetch(`${API_URL}/api/staff-group`, {
+        headers: {
+          accept: "*/*",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-      );
+      });
 
       const data = await res.json().catch(() => ({}));
 
@@ -365,7 +362,7 @@ export default function OwnerTrackingOrder() {
   const stats = React.useMemo(
     () => [
       {
-        title: "Đã duyệt",
+        title: "Chờ phân công",
         value: orders.filter((o) => Number(o.status) === 2).length,
         icon: <CheckCircle2 className="h-5 w-5" />,
         bg: "bg-green-100",
@@ -373,21 +370,22 @@ export default function OwnerTrackingOrder() {
       },
       {
         title: "Đang xử lý",
-        value: orders.filter((o) => Number(o.status) === 4).length,
+        value: orders.filter((o) => [4, 5, 6].includes(Number(o.status)))
+          .length,
         icon: <ClipboardList className="h-5 w-5" />,
         bg: "bg-blue-100",
         text: "text-blue-600",
       },
       {
         title: "Hoàn thành",
-        value: orders.filter((o) => Number(o.status) === 5).length,
+        value: orders.filter((o) => Number(o.status) === 7).length,
         icon: <CheckCircle2 className="h-5 w-5" />,
         bg: "bg-emerald-100",
         text: "text-emerald-600",
       },
       {
-        title: "Đã từ chối",
-        value: orders.filter((o) => Number(o.status) === 3).length,
+        title: "Từ chối / Hủy",
+        value: orders.filter((o) => [3, 8].includes(Number(o.status))).length,
         icon: <XCircle className="h-5 w-5" />,
         bg: "bg-rose-100",
         text: "text-rose-600",
@@ -540,22 +538,27 @@ export default function OwnerTrackingOrder() {
                         key={order.orderId}
                         type="button"
                         onClick={() => setSelectedOrderId(order.orderId)}
-                        className={`w-full rounded-2xl border bg-white p-5 text-left transition ${
+                        className={`w-full rounded-3xl border bg-white p-5 text-left transition-all duration-200 ${
                           active
-                            ? "border-[#7CA3FF] shadow-[0_0_0_2px_rgba(96,133,255,0.18)]"
-                            : "border-transparent hover:border-[#E5E7EB]"
+                            ? "border-[#7CA3FF] shadow-[0_8px_30px_rgba(96,133,255,0.16)]"
+                            : "border-[#EEF2F7] hover:border-[#D9E4F5] hover:shadow-[0_6px_20px_rgba(15,23,42,0.06)]"
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="text-sm font-semibold text-[#2F3A67]">
-                            Đơn hàng #{String(order.orderId).padStart(3, "0")}
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8DA1C1]">
+                              Đơn hàng
+                            </div>
+                            <div className="mt-1 text-base font-bold text-[#2F3A67]">
+                              #{String(order.orderId).padStart(3, "0")}
+                            </div>
                           </div>
 
                           <OrderBadge status={order.status} />
                         </div>
 
-                        <div className="mt-4 grid grid-cols-[90px_1fr] gap-4 items-start">
-                          <div className="h-[90px] w-[90px] overflow-hidden rounded-xl bg-[#F5F5F5]">
+                        <div className="mt-4 grid grid-cols-[88px_minmax(0,1fr)] gap-4 items-start">
+                          <div className="h-[88px] w-[88px] overflow-hidden rounded-2xl bg-[#F6F7FB] ring-1 ring-[#EEF2F7]">
                             {firstImage ? (
                               <img
                                 src={firstImage}
@@ -563,55 +566,43 @@ export default function OwnerTrackingOrder() {
                                 className="h-full w-full object-cover"
                               />
                             ) : (
-                              <div className="h-full w-full flex items-center justify-center text-[11px] text-gray-400">
+                              <div className="flex h-full w-full items-center justify-center text-[11px] text-gray-400">
                                 Không ảnh
                               </div>
                             )}
                           </div>
 
                           <div className="min-w-0">
-                            <div className="text-[30px] leading-none font-bold text-[#2B2B2B]">
+                            <div className="text-[28px] leading-tight font-bold text-[#2B2B2B] break-words">
                               {order.customerName || "--"}
                             </div>
 
-                            <div className="mt-2 text-xs text-[#8DA1C1] flex items-center gap-2">
-                              <span>
-                                {formatTime(
-                                  detail?.startTime || order.createdAt,
-                                )}
-                              </span>
-                              <span>|</span>
-                              <span>
-                                {formatDate(
-                                  detail?.startTime || order.createdAt,
-                                )}
-                              </span>
-                            </div>
-
-                            <div className="mt-3 rounded-xl bg-[#F5F5F5] px-4 py-3 text-sm text-[#2B2B2B] flex items-center justify-between">
-                              <span>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <div className="inline-flex items-center rounded-xl bg-[#F5F7FB] px-3 py-2 text-sm font-medium text-[#42526B]">
                                 {order.orderDetails?.length || 0} tiệc
-                              </span>
-                              <span>⌄</span>
+                              </div>
                             </div>
                           </div>
                         </div>
 
-                        <div className="mt-4 flex items-end justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 text-[#6B8FFB]">
-                              <MapPin className="h-4 w-4" />
-                              <span className="text-xs text-[#B4BED1]">
-                                Địa chỉ
-                              </span>
-                            </div>
-                            <div className="mt-1 text-sm text-[#2F3A67] line-clamp-2">
-                              {detail?.address || "--"}
-                            </div>
-                          </div>
+                        <div className="mt-4 rounded-2xl bg-[#FAFBFD] px-4 py-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 text-[#6B8FFB]">
+                                <MapPin className="h-4 w-4 shrink-0" />
+                                <span className="text-xs font-medium text-[#9AA9C2]">
+                                  Địa chỉ
+                                </span>
+                              </div>
 
-                          <div className="h-9 w-9 shrink-0 rounded-full bg-[#E9F1FF] flex items-center justify-center text-[#6B8FFB]">
-                            <Phone className="h-4 w-4" />
+                              <div className="mt-1 line-clamp-2 text-sm leading-6 text-[#2F3A67]">
+                                {detail?.address || "--"}
+                              </div>
+                            </div>
+
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#EAF2FF] text-[#6B8FFB]">
+                              <MessageCircle className="h-4 w-4" />
+                            </div>
                           </div>
                         </div>
                       </button>
@@ -678,6 +669,11 @@ function OrderDetailPanel({
   onAssign,
   onOpenChat,
 }) {
+  const orderDetails = Array.isArray(order?.orderDetails)
+    ? order.orderDetails
+    : [];
+  const hasMultipleDetails = orderDetails.length > 1;
+
   const menuSnapshot = detail?.menuSnapshot;
   const serviceSnapshot = detail?.serviceSnapshot;
   const firstImage = getFirstImage(menuSnapshot?.imgUrl);
@@ -691,32 +687,54 @@ function OrderDetailPanel({
     ? menuSnapshot.dishes
     : [];
 
-  const extraDishes = Array.isArray(detail?.extraDishes)
-    ? detail.extraDishes
-    : Array.isArray(detail?.customDishes)
-      ? detail.customDishes
-      : Array.isArray(detail?.additionalDishes)
-        ? detail.additionalDishes
-        : [];
+  const extraDishes = Array.isArray(detail?.customDishSnapshot?.customDishes)
+    ? detail.customDishSnapshot.customDishes
+    : Array.isArray(detail?.extraDishes)
+      ? detail.extraDishes
+      : Array.isArray(detail?.customDishes)
+        ? detail.customDishes
+        : Array.isArray(detail?.additionalDishes)
+          ? detail.additionalDishes
+          : [];
+  const menuBasePrice = Number(menuSnapshot?.basePrice || 0);
 
+  const serviceTotal = Array.isArray(serviceSnapshot?.services)
+    ? serviceSnapshot.services.reduce(
+        (sum, s) => sum + Number(s.basePrice || 0) * Number(s.quantity || 1),
+        0,
+      )
+    : 0;
+
+  const customDishTotal = Array.isArray(
+    detail?.customDishSnapshot?.customDishes,
+  )
+    ? detail.customDishSnapshot.customDishes.reduce(
+        (sum, d) => sum + Number(d.totalAmount || 0),
+        0,
+      )
+    : 0;
+
+  const extraCost = Number(detail?.extraChargeCost || 0);
   return (
     <div className="space-y-5">
       <div className="rounded-2xl bg-white p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
+        <div className="flex items-start justify-between gap-6">
+          <div className="min-w-0">
             <div className="text-sm font-semibold text-[#2F3A67]">
               Đơn hàng #{String(order.orderId).padStart(3, "0")}
             </div>
+
             <div className="mt-2 text-[38px] leading-none font-bold text-[#2B2B2B]">
               {order.customerName || "--"}
             </div>
+
             <div className="mt-2 text-xs text-[#8DA1C1]">
               {formatTime(detail?.startTime || order.createdAt)} &nbsp; | &nbsp;
               {formatDate(detail?.startTime || order.createdAt)}
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-3">
             <OrderBadge status={order.status} />
 
             <button
@@ -737,48 +755,69 @@ function OrderDetailPanel({
             </button>
           </div>
         </div>
+
+        <div className="mt-4 w-full rounded-2xl border border-[#F1E7D8] bg-[#FFF9F2] px-5 py-4">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FFEAD5] text-[#E8712E]">
+              <ClipboardList className="h-4 w-4" />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-semibold uppercase tracking-wide text-[#B08968]">
+                Ghi chú đơn hàng
+              </div>
+
+              <div className="mt-1 text-sm leading-6 text-[#5B4636] whitespace-pre-wrap break-words">
+                {order.noteOrder || "Không có ghi chú chung cho đơn hàng."}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="rounded-2xl bg-white p-5">
-        <div className="text-lg font-semibold text-[#2F3A67] mb-4">
-          Danh sách tiệc
-        </div>
+      {hasMultipleDetails ? (
+        <div className="rounded-2xl bg-white p-5">
+          <div className="text-lg font-semibold text-[#2F3A67] mb-4">
+            Danh sách tiệc
+          </div>
 
-        <div className="space-y-3">
-          {order.orderDetails?.map((item, index) => {
-            const active = item.orderDetailId === detail?.orderDetailId;
+          <div className="space-y-3">
+            {orderDetails.map((item, index) => {
+              const active = item.orderDetailId === detail?.orderDetailId;
 
-            return (
-              <button
-                key={item.orderDetailId}
-                type="button"
-                onClick={() => setSelectedOrderDetailId(item.orderDetailId)}
-                className={`w-full rounded-xl border px-4 py-3 text-left transition ${
-                  active
-                    ? "border-[#7CA3FF] bg-[#F8FBFF]"
-                    : "border-[#E5E7EB] bg-white hover:bg-[#FAFAFA]"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="font-semibold text-[#2F3A67]">
-                      Tiệc {index + 1}
+              return (
+                <button
+                  key={item.orderDetailId}
+                  type="button"
+                  onClick={() => setSelectedOrderDetailId(item.orderDetailId)}
+                  className={`w-full rounded-xl border px-4 py-3 text-left transition ${
+                    active
+                      ? "border-[#7CA3FF] bg-[#F8FBFF]"
+                      : "border-[#E5E7EB] bg-white hover:bg-[#FAFAFA]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-[#2F3A67]">
+                        Tiệc {index + 1}
+                      </div>
+                      <div className="mt-1 text-sm text-[#8DA1C1]">
+                        {item.menuName || "--"} •{" "}
+                        {item.partyCategoryName || "--"}
+                      </div>
+                      <div className="mt-1 text-sm text-[#2B2B2B]">
+                        {formatDateTime(item.startTime)}
+                      </div>
                     </div>
-                    <div className="mt-1 text-sm text-[#8DA1C1]">
-                      {item.menuName || "--"} • {item.partyCategoryName || "--"}
-                    </div>
-                    <div className="mt-1 text-sm text-[#2B2B2B]">
-                      {formatDateTime(item.startTime)}
-                    </div>
+
+                    <OrderDetailBadge status={item.status} />
                   </div>
-
-                  <OrderDetailBadge status={item.status} />
-                </div>
-              </button>
-            );
-          })}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -839,36 +878,22 @@ function OrderDetailPanel({
                       value={formatDateTime(detail?.endTime)}
                     />
                   </div>
+                  <div className="mt-4 rounded-xl bg-[#F8F5F1] px-4 py-3">
+                    <div className="text-xs text-[#8DA1C1]">
+                      Ghi chú của tiệc
+                    </div>
+                    <div className="mt-1 text-sm font-medium text-[#2B2B2B] whitespace-pre-wrap">
+                      {detail?.noteOrderDetail ||
+                        "Không có ghi chú riêng cho tiệc này."}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
             <div className="rounded-2xl bg-white p-5">
               <div className="text-lg font-semibold text-[#2F3A67] mb-4">
-                Thông tin thanh toán
-              </div>
-
-              <div className="space-y-3">
-                <PaymentRow label="Tổng đơn hàng" value={order?.totalPrice} />
-                <PaymentRow label="Đã đặt cọc" value={order?.depositAmount} />
-                <PaymentRow label="Còn lại" value={order?.remainingAmount} />
-                <PaymentRow
-                  label="Tổng tiền tiệc này"
-                  value={detail?.totalPrice}
-                />
-                {detail?.extraChargeCost !== null &&
-                detail?.extraChargeCost !== undefined ? (
-                  <PaymentRow
-                    label="Chi phí phát sinh"
-                    value={detail.extraChargeCost}
-                  />
-                ) : null}
-              </div>
-            </div>
-
-            <div className="rounded-2xl bg-white p-5">
-              <div className="text-lg font-semibold text-[#2F3A67] mb-4">
-                Menu và món trong menu
+                Menu
               </div>
 
               <div className="rounded-xl bg-[#F8F5F1] px-4 py-3 mb-4">
@@ -892,9 +917,6 @@ function OrderDetailPanel({
                       <div>
                         <div className="font-medium text-[#2B2B2B]">
                           {dish.dishName}
-                        </div>
-                        <div className="text-sm text-[#8DA1C1]">
-                          Mã món: {dish.dishId}
                         </div>
                       </div>
                     </div>
@@ -920,18 +942,21 @@ function OrderDetailPanel({
                         key={dish.dishId || dish.id || index}
                         className="flex items-center gap-3 rounded-xl bg-[#F8F5F1] px-4 py-3"
                       >
-                        <div className="h-10 w-10 rounded-full bg-[#FFF1E8] flex items-center justify-center text-[#E8712E]">
-                          <UtensilsCrossed className="h-4 w-4" />
+                        <div className="h-10 w-10 rounded-full bg-[#FFF1E8] flex items-center justify-center text-[#E8712E] overflow-hidden">
+                          {dish.img ? (
+                            <img
+                              src={dish.img}
+                              alt={dish.dishName || "dish"}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <UtensilsCrossed className="h-4 w-4" />
+                          )}
                         </div>
 
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <div className="font-medium text-[#2B2B2B]">
                             {dish.dishName || dish.name || "Món lẻ"}
-                          </div>
-                          <div className="text-sm text-[#8DA1C1]">
-                            {dish.quantity
-                              ? `Số lượng: ${dish.quantity}`
-                              : "Món gọi thêm"}
                           </div>
                         </div>
                       </div>
@@ -975,7 +1000,75 @@ function OrderDetailPanel({
                 </div>
               )}
             </div>
+            <div className="rounded-2xl bg-white p-5">
+              <div className="text-lg font-semibold text-[#2F3A67] mb-4">
+                Thông tin thanh toán
+              </div>
 
+              <div className="space-y-2">
+                <div className="py-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-[#6B7280]">Menu</div>
+                    <div className="text-sm font-semibold text-[#2B2B2B]">
+                      {formatPrice(
+                        menuBasePrice * (detail?.numberOfGuests || 0),
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-2 pl-3 border-l border-[#E5E7EB]">
+                    <div className="flex items-center justify-between text-xs text-[#6B7280]">
+                      <span className="truncate">
+                        {menuSnapshot?.menuName || detail?.menuName || "Menu"}
+                      </span>
+                      <span className="text-right whitespace-nowrap">
+                        {formatPrice(menuBasePrice)} x{" "}
+                        {detail?.numberOfGuests || 0} khách ={" "}
+                        {formatPrice(
+                          menuBasePrice * (detail?.numberOfGuests || 0),
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <PaymentGroup
+                  label="Món lẻ"
+                  total={customDishTotal}
+                  items={detail?.customDishSnapshot?.customDishes || []}
+                  type="dish"
+                  guestCount={detail?.numberOfGuests || 0}
+                />
+                <PaymentGroup
+                  label="Dịch vụ"
+                  total={serviceTotal}
+                  items={serviceSnapshot?.services || []}
+                  type="service"
+                />
+
+                {extraCost > 0 && (
+                  <PaymentRow label="Phát sinh" value={extraCost} />
+                )}
+
+                <div className="pt-2 mt-2 border-t border-[#F1F2F6]">
+                  <PaymentRow
+                    label="Tổng tiền tiệc"
+                    value={detail?.totalPrice}
+                    highlight
+                  />
+                </div>
+
+                <div className="pt-2 mt-2 border-t border-[#F1F2F6]">
+                  <PaymentRow label="Tổng đơn" value={order?.totalPrice} />
+                  <PaymentRow label="Đã đặt cọc" value={order?.depositAmount} />
+                  <PaymentRow
+                    label="Còn lại"
+                    value={order?.remainingAmount}
+                    highlight
+                  />
+                </div>
+              </div>
+            </div>
             {(message || error) && (
               <div className="rounded-2xl bg-white p-5">
                 {message ? (
@@ -1076,15 +1169,85 @@ function MiniInfo({ label, value }) {
   );
 }
 
-function PaymentRow({ label, value }) {
+function PaymentRow({ label, value, rightText, highlight = false }) {
   return (
-    <div className="flex items-center justify-between rounded-xl bg-[#F8F5F1] px-4 py-3">
-      <span className="text-sm text-[#8DA1C1]">{label}</span>
-      <span className="font-semibold text-[#2B2B2B]">{formatPrice(value)}</span>
+    <div className="flex items-center justify-between py-2">
+      <div className="text-sm text-[#6B7280]">{label}</div>
+
+      <div className="text-right whitespace-nowrap">
+        {rightText ? (
+          <span className="text-sm font-medium text-[#2B2B2B]">
+            {rightText}
+          </span>
+        ) : (
+          <span
+            className={`text-sm font-semibold ${
+              highlight ? "text-[#E54B2D]" : "text-[#2B2B2B]"
+            }`}
+          >
+            {formatPrice(value)}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
+function PaymentGroup({ label, total, items, type, guestCount = 0 }) {
+  return (
+    <div className="py-2">
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-[#6B7280]">{label}</div>
+        <div className="text-sm font-semibold text-[#2B2B2B]">
+          {formatPrice(total)}
+        </div>
+      </div>
 
+      {items.length > 0 && (
+        <div className="mt-2 space-y-1 pl-3 border-l border-[#E5E7EB]">
+          {items.map((item, index) => {
+            if (type === "service") {
+              const price = Number(item.basePrice || 0);
+              const qty = Number(item.quantity || 1);
+              const total = price * qty;
+
+              return (
+                <div
+                  key={item.serviceId || index}
+                  className="flex items-center justify-between text-xs text-[#6B7280]"
+                >
+                  <span className="truncate">{item.serviceName}</span>
+                  <span>
+                    {formatPrice(price)} x {qty} = {formatPrice(total)}
+                  </span>
+                </div>
+              );
+            }
+
+            if (type === "dish") {
+              const price = Number(item.unitPrice || 0);
+              const total = Number(item.totalAmount || 0);
+
+              return (
+                <div
+                  key={item.dishId || index}
+                  className="flex items-center justify-between text-xs text-[#6B7280]"
+                >
+                  <span className="truncate">{item.dishName}</span>
+                  <span>
+                    {formatPrice(price)} x {guestCount} khách ={" "}
+                    {formatPrice(total)}
+                  </span>
+                </div>
+              );
+            }
+
+            return null;
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 function OrderStatusStep({ title, active, last }) {
   return (
     <div className="flex items-start gap-3">
@@ -1129,7 +1292,7 @@ function OrderBadge({ status }) {
     },
     3: {
       label: "Đã từ chối",
-      className: "bg-[#FEE2E2] text-[#B91C1C]",
+      className: "bg-[#F3F4F6] text-[#6B7280]",
     },
     4: {
       label: "Đang xử lý",
@@ -1140,12 +1303,16 @@ function OrderBadge({ status }) {
       className: "bg-[#D1FAE5] text-[#047857]",
     },
     6: {
+      label: "Đang chờ thanh toán",
+      className: "bg-[#FEF3C7] text-[#B45309]",
+    },
+    7: {
       label: "Đã thanh toán",
       className: "bg-[#EDE9FE] text-[#6D28D9]",
     },
-    7: {
+    8: {
       label: "Đã hủy",
-      className: "bg-[#F3F4F6] text-[#6B7280]",
+      className: "bg-[#FEE2E2] text-[#B91C1C]",
     },
   };
 
@@ -1177,7 +1344,7 @@ function OrderDetailBadge({ status }) {
     },
     3: {
       label: "Từ chối",
-      className: "bg-[#FEE2E2] text-[#B91C1C]",
+      className: "bg-[#F3F4F6] text-[#6B7280]",
     },
     4: {
       label: "Chuẩn bị",
@@ -1193,7 +1360,7 @@ function OrderDetailBadge({ status }) {
     },
     7: {
       label: "Đã hủy",
-      className: "bg-[#F3F4F6] text-[#6B7280]",
+      className: "bg-[#FEE2E2] text-[#B91C1C]",
     },
   };
 
