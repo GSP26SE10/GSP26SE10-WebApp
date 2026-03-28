@@ -5,102 +5,78 @@ import ChatPanel from "@/components/ChatPanel";
 import API_URL from "@/config/api";
 import {
   ClipboardList,
-  CheckCircle2,
-  XCircle,
   Filter,
   MapPin,
-  Phone,
-  FileDown,
   Check,
   Ban,
   ChefHat,
-  UtensilsCrossed,
   Wallet,
   Users,
   Clock3,
+  MessageCircle,
+  ChevronDown,
+  AlertTriangle,
 } from "lucide-react";
 
 const ORDER_STATUS_MAP = {
-  1: {
-    label: "Chờ duyệt",
-    className: "bg-[#FEF3C7] text-[#B45309]",
-  },
-  2: {
-    label: "Đã duyệt",
-    className: "bg-[#DCFCE7] text-[#15803D]",
-  },
-  3: {
-    label: "Từ chối",
-    className: "bg-[#F3F4F6] text-[#6B7280]",
-  },
-  4: {
-    label: "Đang chuẩn bị",
-    className: "bg-[#DBEAFE] text-[#1D4ED8]",
-  },
-  5: {
-    label: "Đang thực hiện",
-    className: "bg-[#E0E7FF] text-[#4338CA]",
-  },
-  6: {
-    label: "Thanh toán",
-    className: "bg-[#EDE9FE] text-[#6D28D9]",
-  },
-  7: {
-    label: "Hoàn thành",
-    className: "bg-[#D1FAE5] text-[#047857]",
-  },
-  8: {
-    label: "Đã hủy",
-    className: "bg-[#FEE2E2] text-[#B91C1C]",
-  },
+  1: { label: "Chờ duyệt", className: "bg-[#FEF3C7] text-[#B45309]" },
+  2: { label: "Đã duyệt", className: "bg-[#DCFCE7] text-[#15803D]" },
+  3: { label: "Từ chối", className: "bg-[#F3F4F6] text-[#6B7280]" },
+  4: { label: "Đang chuẩn bị", className: "bg-[#DBEAFE] text-[#1D4ED8]" },
+  5: { label: "Đang thực hiện", className: "bg-[#E0E7FF] text-[#4338CA]" },
+  6: { label: "Thanh toán", className: "bg-[#EDE9FE] text-[#6D28D9]" },
+  7: { label: "Hoàn thành", className: "bg-[#D1FAE5] text-[#047857]" },
+  8: { label: "Đã hủy", className: "bg-[#FEE2E2] text-[#B91C1C]" },
 };
 
 const ORDER_DETAIL_STATUS_MAP = {
-  1: {
-    label: "Chờ duyệt",
-    className: "bg-[#FEF3C7] text-[#B45309]",
-  },
-  2: {
-    label: "Đã duyệt",
-    className: "bg-[#DCFCE7] text-[#15803D]",
-  },
-  3: {
-    label: "Từ chối",
-    className: "bg-[#F3F4F6] text-[#6B7280]",
-  },
-  4: {
-    label: "Đang chuẩn bị",
-    className: "bg-[#DBEAFE] text-[#1D4ED8]",
-  },
-  5: {
-    label: "Đang thực hiện",
-    className: "bg-[#E0E7FF] text-[#4338CA]",
-  },
-  6: {
-    label: "Hoàn thành",
-    className: "bg-[#D1FAE5] text-[#047857]",
-  },
-  7: {
-    label: "Đã hủy",
-    className: "bg-[#FEE2E2] text-[#B91C1C]",
-  },
+  1: { label: "Chờ duyệt", className: "bg-[#FEF3C7] text-[#B45309]" },
+  2: { label: "Đã duyệt", className: "bg-[#DCFCE7] text-[#15803D]" },
+  3: { label: "Từ chối", className: "bg-[#F3F4F6] text-[#6B7280]" },
+  4: { label: "Đang chuẩn bị", className: "bg-[#DBEAFE] text-[#1D4ED8]" },
+  5: { label: "Đang thực hiện", className: "bg-[#E0E7FF] text-[#4338CA]" },
+  6: { label: "Hoàn thành", className: "bg-[#D1FAE5] text-[#047857]" },
+  7: { label: "Đã hủy", className: "bg-[#FEE2E2] text-[#B91C1C]" },
 };
 
 export default function OwnerPendingOrder() {
   const [sbExpanded, setSbExpanded] = React.useState(false);
   const [openChat, setOpenChat] = React.useState(false);
-
   const [orders, setOrders] = React.useState([]);
+  const [activeConversation, setActiveConversation] = React.useState(null);
+  const [chatMessages, setChatMessages] = React.useState([]);
+  const [chatLoading, setChatLoading] = React.useState(false);
+  const [chatError, setChatError] = React.useState("");
+  const [sendingMessage, setSendingMessage] = React.useState(false);
+  const [chatInput, setChatInput] = React.useState("");
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
   const [message, setMessage] = React.useState("");
   const [selectedOrderId, setSelectedOrderId] = React.useState(null);
+  const [selectedOrderDetailId, setSelectedOrderDetailId] =
+    React.useState(null);
   const [search, setSearch] = React.useState("");
   const [actionLoading, setActionLoading] = React.useState("");
+  const [rejectReason, setRejectReason] = React.useState("");
+  const [openRejectModal, setOpenRejectModal] = React.useState(false);
 
   const token =
     localStorage.getItem("accessToken") ||
     sessionStorage.getItem("accessToken");
+
+  const ownerId = React.useMemo(() => {
+    const userRaw =
+      localStorage.getItem("userId") || sessionStorage.getItem("userId");
+
+    if (!userRaw) return null;
+
+    try {
+      const user = JSON.parse(userRaw);
+      return user?.userId || user?.ownerId || user?.id || null;
+    } catch {
+      return null;
+    }
+  }, []);
 
   const fetchOrders = React.useCallback(async () => {
     setLoading(true);
@@ -132,6 +108,7 @@ export default function OwnerPendingOrder() {
         });
       } else {
         setSelectedOrderId(null);
+        setSelectedOrderDetailId(null);
       }
     } catch (err) {
       setError(err.message || "Đã có lỗi xảy ra");
@@ -149,29 +126,55 @@ export default function OwnerPendingOrder() {
     if (!keyword) return orders;
 
     return orders.filter((order) => {
-      const detail = order.orderDetails?.[0];
+      const details = Array.isArray(order.orderDetails)
+        ? order.orderDetails
+        : [];
 
-      return (
+      const matchOrder =
         String(order.orderId).includes(keyword) ||
         String(order.customerName || "")
           .toLowerCase()
-          .includes(keyword) ||
-        String(detail?.address || "")
-          .toLowerCase()
-          .includes(keyword) ||
-        String(detail?.menuName || "")
-          .toLowerCase()
-          .includes(keyword) ||
-        String(detail?.partyCategoryName || "")
-          .toLowerCase()
-          .includes(keyword)
-      );
+          .includes(keyword);
+
+      const matchDetail = details.some((detail) => {
+        return (
+          String(detail?.address || "")
+            .toLowerCase()
+            .includes(keyword) ||
+          String(detail?.menuName || "")
+            .toLowerCase()
+            .includes(keyword) ||
+          String(detail?.partyCategoryName || "")
+            .toLowerCase()
+            .includes(keyword)
+        );
+      });
+
+      return matchOrder || matchDetail;
     });
   }, [orders, search]);
 
   const selectedOrder =
     filteredOrders.find((order) => order.orderId === selectedOrderId) ||
     filteredOrders[0] ||
+    null;
+
+  React.useEffect(() => {
+    const firstDetail = selectedOrder?.orderDetails?.[0] || null;
+
+    setSelectedOrderDetailId((prev) => {
+      const exists = selectedOrder?.orderDetails?.some(
+        (detail) => detail.orderDetailId === prev,
+      );
+      return exists ? prev : (firstDetail?.orderDetailId ?? null);
+    });
+  }, [selectedOrder]);
+
+  const selectedDetail =
+    selectedOrder?.orderDetails?.find(
+      (detail) => detail.orderDetailId === selectedOrderDetailId,
+    ) ||
+    selectedOrder?.orderDetails?.[0] ||
     null;
 
   const stats = React.useMemo(
@@ -227,6 +230,11 @@ export default function OwnerPendingOrder() {
   const handleRejectOrder = async () => {
     if (!selectedOrder) return;
 
+    if (!rejectReason.trim()) {
+      setError("Vui lòng nhập lý do từ chối");
+      return;
+    }
+
     setActionLoading("reject");
     setMessage("");
     setError("");
@@ -241,7 +249,10 @@ export default function OwnerPendingOrder() {
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          body: JSON.stringify({ status: 3 }),
+          body: JSON.stringify({
+            status: 3,
+            noteOrder: rejectReason,
+          }),
         },
       );
 
@@ -252,12 +263,182 @@ export default function OwnerPendingOrder() {
       }
 
       setMessage("Từ chối đơn thành công.");
+      setRejectReason("");
+      setOpenRejectModal(false);
       setSelectedOrderId(null);
       await fetchOrders();
     } catch (err) {
       setError(err.message || "Từ chối đơn thất bại");
     } finally {
       setActionLoading("");
+    }
+  };
+
+  const openCustomerChat = async (order) => {
+    if (!order?.customerId) {
+      setChatError("Không tìm thấy khách hàng.");
+      setOpenChat(true);
+      return;
+    }
+
+    if (!ownerId) {
+      setChatError("Không tìm thấy ownerId hiện tại.");
+      setOpenChat(true);
+      return;
+    }
+
+    setChatLoading(true);
+    setChatError("");
+    setChatInput("");
+
+    try {
+      let conversation = null;
+
+      const conversationRes = await fetch(`${API_URL}/api/conversation`, {
+        headers: {
+          accept: "*/*",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const conversationData = await conversationRes.json().catch(() => ({}));
+
+      if (!conversationRes.ok) {
+        throw new Error(
+          conversationData?.message ||
+            "Không thể tải danh sách cuộc trò chuyện",
+        );
+      }
+
+      const conversations = Array.isArray(conversationData?.items)
+        ? conversationData.items
+        : [];
+
+      conversation =
+        conversations.find(
+          (item) =>
+            Number(item.customerId) === Number(order.customerId) &&
+            Number(item.ownerId) === Number(ownerId),
+        ) || null;
+
+      if (!conversation) {
+        const createRes = await fetch(`${API_URL}/api/conversation`, {
+          method: "POST",
+          headers: {
+            accept: "*/*",
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            customerId: Number(order.customerId),
+            ownerId: Number(ownerId),
+          }),
+        });
+
+        const createData = await createRes.json().catch(() => ({}));
+
+        if (!createRes.ok) {
+          throw new Error(
+            createData?.message || "Không thể tạo cuộc trò chuyện",
+          );
+        }
+
+        if (Array.isArray(createData?.items) && createData.items.length > 0) {
+          conversation = createData.items[0];
+        } else {
+          conversation = createData?.data ||
+            createData || {
+              conversationId: createData?.conversationId,
+              customerId: order.customerId,
+              ownerId,
+            };
+        }
+      }
+
+      if (!conversation?.conversationId) {
+        throw new Error("Không tìm thấy conversationId.");
+      }
+
+      const messageRes = await fetch(`${API_URL}/api/message`, {
+        headers: {
+          accept: "*/*",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      const messageData = await messageRes.json().catch(() => ({}));
+
+      if (!messageRes.ok) {
+        throw new Error(messageData?.message || "Không thể tải tin nhắn");
+      }
+
+      const allMessages = Array.isArray(messageData?.items)
+        ? messageData.items
+        : [];
+
+      const messages = allMessages
+        .filter(
+          (item) =>
+            Number(item.conversationId) === Number(conversation.conversationId),
+        )
+        .sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt));
+
+      setActiveConversation(conversation);
+      setChatMessages(messages);
+      setOpenChat(true);
+    } catch (err) {
+      setChatError(err.message || "Không thể mở đoạn chat");
+      setOpenChat(true);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    const content = chatInput.trim();
+
+    if (!content || !activeConversation?.conversationId || !ownerId) return;
+
+    setSendingMessage(true);
+    setChatError("");
+
+    try {
+      const res = await fetch(`${API_URL}/api/message`, {
+        method: "POST",
+        headers: {
+          accept: "*/*",
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          conversationId: Number(activeConversation.conversationId),
+          senderId: Number(ownerId),
+          content,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Không thể gửi tin nhắn");
+      }
+
+      const newMessage = data?.data ||
+        data || {
+          messageId: Date.now(),
+          conversationId: activeConversation.conversationId,
+          senderId: ownerId,
+          content,
+          senderName: activeConversation.ownerName || "Bạn",
+          sentAt: new Date().toISOString(),
+        };
+
+      setChatMessages((prev) => [...prev, newMessage]);
+      setChatInput("");
+    } catch (err) {
+      setChatError(err.message || "Không thể gửi tin nhắn");
+    } finally {
+      setSendingMessage(false);
     }
   };
 
@@ -284,8 +465,9 @@ export default function OwnerPendingOrder() {
           searchValue={search}
           onSearchChange={setSearch}
           searchPlaceholder="Tìm đơn hàng"
-          onMailClick={() => setOpenChat(true)}
-          avatarSrc="https://gocnhobecon.com/wp-content/uploads/2025/08/meme-con-meo-cuoi.webp"
+          onMailClick={() =>
+            selectedOrder ? openCustomerChat(selectedOrder) : setOpenChat(true)
+          }
         />
 
         <main className="px-7 py-6">
@@ -357,22 +539,27 @@ export default function OwnerPendingOrder() {
                         key={order.orderId}
                         type="button"
                         onClick={() => setSelectedOrderId(order.orderId)}
-                        className={`w-full rounded-2xl border bg-white p-5 text-left transition ${
+                        className={`w-full rounded-3xl border bg-white p-5 text-left transition-all duration-200 ${
                           active
-                            ? "border-[#7CA3FF] shadow-[0_0_0_2px_rgba(96,133,255,0.18)]"
-                            : "border-transparent hover:border-[#E5E7EB]"
+                            ? "border-[#7CA3FF] shadow-[0_8px_30px_rgba(96,133,255,0.16)]"
+                            : "border-[#EEF2F7] hover:border-[#D9E4F5] hover:shadow-[0_6px_20px_rgba(15,23,42,0.06)]"
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="text-sm font-semibold text-[#2F3A67]">
-                            Đơn hàng #{String(order.orderId).padStart(3, "0")}
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8DA1C1]">
+                              Đơn hàng
+                            </div>
+                            <div className="mt-1 text-base font-bold text-[#2F3A67]">
+                              #{String(order.orderId).padStart(3, "0")}
+                            </div>
                           </div>
 
                           <StatusBadge type="order" status={order.status} />
                         </div>
 
-                        <div className="mt-4 grid grid-cols-[90px_1fr] gap-4 items-start">
-                          <div className="h-[90px] w-[90px] overflow-hidden rounded-xl bg-[#F5F5F5]">
+                        <div className="mt-4 grid grid-cols-[88px_minmax(0,1fr)] gap-4 items-start">
+                          <div className="h-[88px] w-[88px] overflow-hidden rounded-2xl bg-[#F6F7FB] ring-1 ring-[#EEF2F7]">
                             {firstImage ? (
                               <img
                                 src={firstImage}
@@ -380,55 +567,55 @@ export default function OwnerPendingOrder() {
                                 className="h-full w-full object-cover"
                               />
                             ) : (
-                              <div className="h-full w-full flex items-center justify-center text-[11px] text-gray-400">
+                              <div className="flex h-full w-full items-center justify-center text-[11px] text-gray-400">
                                 Không ảnh
                               </div>
                             )}
                           </div>
 
                           <div className="min-w-0">
-                            <div className="text-[30px] leading-none font-bold text-[#2B2B2B]">
+                            <div className="text-[28px] leading-tight font-bold text-[#2B2B2B] break-words">
                               {order.customerName || "--"}
                             </div>
 
-                            <div className="mt-2 text-xs text-[#8DA1C1] flex items-center gap-2">
-                              <span>
-                                {formatTime(
-                                  detail?.startTime || order.createdAt,
-                                )}
-                              </span>
-                              <span>|</span>
-                              <span>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <div className="inline-flex items-center rounded-xl bg-[#F5F7FB] px-3 py-2 text-sm font-medium text-[#42526B]">
+                                {order.orderDetails?.length || 0} tiệc
+                              </div>
+                              <div className="inline-flex items-center rounded-xl bg-[#FFF7ED] px-3 py-2 text-sm font-medium text-[#C2410C]">
                                 {formatDate(
                                   detail?.startTime || order.createdAt,
                                 )}
-                              </span>
-                            </div>
-
-                            <div className="mt-3 rounded-xl bg-[#F5F5F5] px-4 py-3 text-sm text-[#2B2B2B] flex items-center justify-between">
-                              <span>
-                                1 x {detail?.menuName || "Menu chưa xác định"}
-                              </span>
-                              <span>⌄</span>
+                              </div>
                             </div>
                           </div>
                         </div>
 
-                        <div className="mt-4 flex items-end justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 text-[#6B8FFB]">
-                              <MapPin className="h-4 w-4" />
-                              <span className="text-xs text-[#B4BED1]">
-                                Địa chỉ
-                              </span>
-                            </div>
-                            <div className="mt-1 text-sm text-[#2F3A67] line-clamp-2">
-                              {detail?.address || "--"}
-                            </div>
-                          </div>
+                        <div className="mt-4 rounded-2xl bg-[#FAFBFD] px-4 py-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 text-[#6B8FFB]">
+                                <MapPin className="h-4 w-4 shrink-0" />
+                                <span className="text-xs font-medium text-[#9AA9C2]">
+                                  Địa chỉ
+                                </span>
+                              </div>
 
-                          <div className="h-9 w-9 shrink-0 rounded-full bg-[#E9F1FF] flex items-center justify-center text-[#6B8FFB]">
-                            <Phone className="h-4 w-4" />
+                              <div className="mt-1 line-clamp-2 text-sm leading-6 text-[#2F3A67]">
+                                {detail?.address || "--"}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openCustomerChat(order);
+                              }}
+                              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#EAF2FF] text-[#6B8FFB] hover:bg-[#dfeaff]"
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                            </button>
                           </div>
                         </div>
                       </button>
@@ -439,18 +626,25 @@ export default function OwnerPendingOrder() {
             </section>
 
             <section className="min-h-0 xl:h-full overflow-y-auto hide-scrollbar pr-1">
-              {!selectedOrder ? (
+              {!selectedOrder || !selectedDetail ? (
                 <div className="rounded-2xl bg-white p-6 text-sm text-gray-500">
                   Chọn một đơn hàng để xem chi tiết.
                 </div>
               ) : (
                 <OrderDetailPanel
                   order={selectedOrder}
+                  detail={selectedDetail}
                   actionLoading={actionLoading}
                   message={message}
                   error={error}
                   onApprove={handleApproveOrder}
                   onReject={handleRejectOrder}
+                  openRejectModal={openRejectModal}
+                  setOpenRejectModal={setOpenRejectModal}
+                  rejectReason={rejectReason}
+                  setRejectReason={setRejectReason}
+                  setSelectedOrderDetailId={setSelectedOrderDetailId}
+                  onOpenChat={openCustomerChat}
                 />
               )}
             </section>
@@ -458,77 +652,158 @@ export default function OwnerPendingOrder() {
         </main>
       </div>
 
-      <ChatPanel open={openChat} onClose={() => setOpenChat(false)} />
+      <ChatPanel
+        open={openChat}
+        onClose={() => setOpenChat(false)}
+        conversation={activeConversation}
+        messages={chatMessages}
+        loading={chatLoading}
+        error={chatError}
+        input={chatInput}
+        setInput={setChatInput}
+        onSend={handleSendMessage}
+        sending={sendingMessage}
+        currentUserId={ownerId}
+      />
     </div>
   );
 }
 
 function OrderDetailPanel({
   order,
+  detail,
   actionLoading,
   message,
   error,
   onApprove,
   onReject,
+  openRejectModal,
+  setOpenRejectModal,
+  rejectReason,
+  setRejectReason,
+  setSelectedOrderDetailId,
+  onOpenChat,
 }) {
-  const detail = order.orderDetails?.[0];
+  const orderDetails = Array.isArray(order?.orderDetails)
+    ? order.orderDetails
+    : [];
+  const hasMultipleDetails = orderDetails.length > 1;
+
   const menuSnapshot = detail?.menuSnapshot;
   const serviceSnapshot = detail?.serviceSnapshot;
   const firstImage = getFirstImage(menuSnapshot?.imgUrl);
   const mapSrc = getGoogleMapEmbedUrl(detail?.address);
+  const detailStatus = Number(detail?.status ?? 1);
+  const statusSteps = buildOrderDetailStatusSteps(detailStatus);
+  const menuDishes = Array.isArray(menuSnapshot?.dishes)
+    ? menuSnapshot.dishes
+    : [];
+  const menuBasePrice = Number(menuSnapshot?.basePrice || 0);
+  const serviceTotal = Array.isArray(serviceSnapshot?.services)
+    ? serviceSnapshot.services.reduce(
+        (sum, s) => sum + Number(s.basePrice || 0) * Number(s.quantity || 1),
+        0,
+      )
+    : 0;
+  const extraCost = Number(detail?.extraChargeCost || 0);
+  const [openMenu, setOpenMenu] = React.useState(false);
 
   return (
     <div className="space-y-5">
       <div className="rounded-2xl bg-white p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
+        <div className="flex items-start justify-between gap-6">
+          <div className="min-w-0">
             <div className="text-sm font-semibold text-[#2F3A67]">
               Đơn hàng #{String(order.orderId).padStart(3, "0")}
             </div>
+
             <div className="mt-2 text-[38px] leading-none font-bold text-[#2B2B2B]">
               {order.customerName || "--"}
             </div>
+
             <div className="mt-2 text-xs text-[#8DA1C1]">
               {formatTime(detail?.startTime || order.createdAt)} &nbsp; | &nbsp;
               {formatDate(detail?.startTime || order.createdAt)}
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-3">
             <StatusBadge type="order" status={order.status} />
 
             <button
               type="button"
+              onClick={() => onOpenChat(order)}
               className="inline-flex items-center gap-2 rounded-xl border border-[#DCE6F7] px-4 py-2 text-sm text-[#6B8FFB] hover:bg-[#F8FBFF]"
             >
-              <FileDown className="h-4 w-4" />
-              Xuất file
+              <MessageCircle className="h-4 w-4" />
+              Chat
             </button>
           </div>
         </div>
-      </div>
 
-      <div className="rounded-2xl bg-white p-5">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <MiniInfo
-            label="Status Order"
-            value={<StatusBadge type="order" status={order.status} />}
-          />
-          <MiniInfo
-            label="Status OrderDetail"
-            value={<StatusBadge type="orderDetail" status={detail?.status} />}
-          />
-        </div>
+        <div className="mt-4 w-full rounded-2xl border border-[#FDE7C7] bg-[#FFF9F2] px-5 py-4">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FFEAD5] text-[#E8712E]">
+              <AlertTriangle className="h-4 w-4" />
+            </div>
 
-        {(message || error) && (
-          <div className="mt-4 rounded-2xl bg-white">
-            {message ? (
-              <div className="text-sm text-green-600">{message}</div>
-            ) : null}
-            {error ? <div className="text-sm text-red-500">{error}</div> : null}
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-semibold uppercase tracking-wide text-[#B08968]">
+                Lưu ý khi duyệt đơn
+              </div>
+
+              <div className="mt-1 text-sm leading-6 text-[#5B4636] whitespace-pre-wrap break-words">
+                Kiểm tra thời gian tổ chức, địa chỉ, số lượng khách, menu và số
+                tiền cọc trước khi xác nhận.
+              </div>
+            </div>
           </div>
-        )}
+        </div>
       </div>
+
+      {hasMultipleDetails ? (
+        <div className="rounded-2xl bg-white p-5">
+          <div className="text-lg font-semibold text-[#2F3A67] mb-4">
+            Danh sách tiệc
+          </div>
+
+          <div className="space-y-3">
+            {orderDetails.map((item, index) => {
+              const active = item.orderDetailId === detail?.orderDetailId;
+
+              return (
+                <button
+                  key={item.orderDetailId}
+                  type="button"
+                  onClick={() => setSelectedOrderDetailId(item.orderDetailId)}
+                  className={`w-full rounded-xl border px-4 py-3 text-left transition ${
+                    active
+                      ? "border-[#7CA3FF] bg-[#F8FBFF]"
+                      : "border-[#E5E7EB] bg-white hover:bg-[#FAFAFA]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-[#2F3A67]">
+                        Tiệc {index + 1}
+                      </div>
+                      <div className="mt-1 text-sm text-[#8DA1C1]">
+                        {item.menuName || "--"} •{" "}
+                        {item.partyCategoryName || "--"}
+                      </div>
+                      <div className="mt-1 text-sm text-[#2B2B2B]">
+                        {formatDateTime(item.startTime)}
+                      </div>
+                    </div>
+
+                    <StatusBadge type="orderDetail" status={item.status} />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <div>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -539,7 +814,7 @@ function OrderDetailPanel({
               type="button"
               onClick={onApprove}
               disabled={actionLoading === "approve"}
-              className="inline-flex items-center gap-2 rounded-xl bg-green-500 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#2F855A] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
             >
               <Check className="h-4 w-4" />
               {actionLoading === "approve" ? "Đang duyệt..." : "Duyệt đơn"}
@@ -547,9 +822,9 @@ function OrderDetailPanel({
 
             <button
               type="button"
-              onClick={onReject}
+              onClick={() => setOpenRejectModal(true)}
               disabled={actionLoading === "reject"}
-              className="inline-flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#D64545] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
             >
               <Ban className="h-4 w-4" />
               {actionLoading === "reject" ? "Đang từ chối..." : "Từ chối"}
@@ -560,6 +835,13 @@ function OrderDetailPanel({
         <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr] gap-5">
           <div className="space-y-5">
             <div className="rounded-2xl bg-white p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="text-lg font-semibold text-[#2F3A67]">Menu</div>
+                <div className="text-xs font-medium text-[#8DA1C1]">
+                  {menuDishes.length} món
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-5 items-start">
                 <div className="h-[180px] overflow-hidden rounded-2xl bg-[#F5F5F5] border border-[#F1F2F6]">
                   {firstImage ? (
@@ -585,125 +867,100 @@ function OrderDetailPanel({
                   </div>
 
                   <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <MiniInfo
+                    <InfoBox
+                      icon={<Users className="h-4 w-4" />}
                       label="Số khách"
                       value={`${detail?.numberOfGuests || 0} khách`}
                     />
-                    <MiniInfo
+                    <InfoBox
+                      icon={<Wallet className="h-4 w-4" />}
                       label="Giá menu"
-                      value={formatPrice(
-                        menuSnapshot?.basePrice || order.totalPrice,
-                      )}
+                      value={formatPrice(menuBasePrice)}
                     />
-                    <MiniInfo
+                    <InfoBox
+                      icon={<Clock3 className="h-4 w-4" />}
                       label="Bắt đầu"
                       value={formatDateTime(detail?.startTime)}
                     />
-                    <MiniInfo
+                    <InfoBox
+                      icon={<Clock3 className="h-4 w-4" />}
                       label="Kết thúc"
                       value={formatDateTime(detail?.endTime)}
                     />
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="rounded-2xl bg-white p-5">
-              <div className="text-lg font-semibold text-[#2F3A67] mb-4">
-                Menu và món trong menu
-              </div>
+              <div className="mt-4 w-full rounded-2xl border border-[#FDE7C7] bg-[#FFF9F2] px-5 py-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FFEAD5] text-[#E8712E]">
+                    <ClipboardList className="h-4 w-4" />
+                  </div>
 
-              <div className="rounded-xl bg-[#F8F5F1] px-4 py-3 mb-4">
-                <div className="text-sm text-[#8DA1C1]">Tên menu</div>
-                <div className="mt-1 font-semibold text-[#2B2B2B]">
-                  {detail?.menuName || menuSnapshot?.menuName || "--"}
-                </div>
-              </div>
-
-              {Array.isArray(menuSnapshot?.dishes) &&
-              menuSnapshot.dishes.length > 0 ? (
-                <div className="space-y-3">
-                  {menuSnapshot.dishes.map((dish) => (
-                    <div
-                      key={dish.dishId}
-                      className="flex items-center gap-3 rounded-xl bg-[#F8F5F1] px-4 py-3"
-                    >
-                      <div className="h-10 w-10 rounded-full bg-[#FFF1E8] flex items-center justify-center text-[#E8712E]">
-                        <ChefHat className="h-4 w-4" />
-                      </div>
-
-                      <div>
-                        <div className="font-medium text-[#2B2B2B]">
-                          {dish.dishName}
-                        </div>
-                        <div className="text-sm text-[#8DA1C1]">
-                          Mã món: {dish.dishId}
-                        </div>
-                      </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-[#B08968]">
+                      Ghi chú tiệc
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500">
-                  Không có món trong menu.
-                </div>
-              )}
-            </div>
 
-            <div className="rounded-2xl bg-white p-5">
-              <div className="text-lg font-semibold text-[#2F3A67] mb-4">
-                Thông tin thanh toán
-              </div>
-
-              <div className="space-y-3">
-                <PaymentRow label="Tổng đơn hàng" value={order.totalPrice} />
-                <PaymentRow label="Đã đặt cọc" value={order.depositAmount} />
-                <PaymentRow label="Còn lại" value={order.remainingAmount} />
-                <PaymentRow
-                  label="Chi phí phát sinh"
-                  value={detail?.extraChargeCost || 0}
-                />
-              </div>
-
-              <div className="mt-6 flex items-center justify-between border-t border-[#EEF2F7] pt-4">
-                <div className="text-lg font-semibold text-[#2F3A67]">
-                  Thanh toán
-                </div>
-                <div className="text-2xl font-bold text-[#2B2B2B]">
-                  {formatPrice(order.remainingAmount)}
+                    <div className="mt-1 text-sm leading-6 text-[#5B4636] whitespace-pre-wrap break-words">
+                      {detail?.noteOrderDetail ||
+                        "Không có ghi chú riêng cho tiệc này."}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="rounded-2xl bg-white p-5">
-              <div className="text-lg font-semibold text-[#2F3A67] mb-4">
-                Thông tin tiệc
-              </div>
+              <button
+                type="button"
+                onClick={() => setOpenMenu((prev) => !prev)}
+                className="mt-5 w-full rounded-2xl border border-[#EEF2F7] bg-[#FAFBFD] px-4 py-4 text-left transition hover:border-[#D9E4F5] hover:bg-[#F7F9FC]"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium uppercase tracking-wide text-[#8DA1C1]">
+                      Tên menu
+                    </div>
+                    <div className="mt-1 text-base font-semibold text-[#2B2B2B] break-words">
+                      {detail?.menuName || menuSnapshot?.menuName || "--"}
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-[#2F3A67]">
-                <InfoBox
-                  icon={<Users className="h-4 w-4" />}
-                  label="Số khách"
-                  value={`${detail?.numberOfGuests || 0} khách`}
-                />
-                <InfoBox
-                  icon={<UtensilsCrossed className="h-4 w-4" />}
-                  label="Loại tiệc"
-                  value={detail?.partyCategoryName || "--"}
-                />
-                <InfoBox
-                  icon={<Wallet className="h-4 w-4" />}
-                  label="Menu"
-                  value={detail?.menuName || "--"}
-                />
-                <InfoBox
-                  icon={<Clock3 className="h-4 w-4" />}
-                  label="Thời gian"
-                  value={`${formatDateTime(detail?.startTime)} - ${formatTime(
-                    detail?.endTime,
-                  )}`}
-                />
-              </div>
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#8DA1C1] ring-1 ring-[#EEF2F7] transition-transform duration-200 ${
+                      openMenu ? "rotate-180" : ""
+                    }`}
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </div>
+                </div>
+              </button>
+
+              {openMenu ? (
+                <div className="mt-4 space-y-3">
+                  {menuDishes.length > 0 ? (
+                    menuDishes.map((dish, index) => (
+                      <div
+                        key={dish.dishId || index}
+                        className="flex items-center gap-3 rounded-2xl border border-[#F1F2F6] bg-[#FFFDFC] px-4 py-3"
+                      >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FFF1E8] text-[#E8712E]">
+                          <ChefHat className="h-4 w-4" />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-[#2B2B2B] break-words">
+                            {dish.dishName}
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-xl bg-[#FAFBFD] px-4 py-3 text-sm text-gray-500">
+                      Không có món trong menu.
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </div>
 
             <div className="rounded-2xl bg-white p-5">
@@ -739,6 +996,52 @@ function OrderDetailPanel({
                 </div>
               )}
             </div>
+
+            <div className="rounded-2xl bg-white p-5">
+              <div className="text-lg font-semibold text-[#2F3A67] mb-4">
+                Thông tin thanh toán
+              </div>
+
+              <div className="space-y-2">
+                <PaymentRow
+                  label="Menu"
+                  value={menuBasePrice * Number(detail?.numberOfGuests || 0)}
+                />
+                <PaymentRow label="Dịch vụ đi kèm" value={serviceTotal} />
+                {extraCost > 0 && (
+                  <PaymentRow label="Chi phí phát sinh" value={extraCost} />
+                )}
+
+                <div className="pt-2 mt-2 border-t border-[#F1F2F6]">
+                  <PaymentRow
+                    label="Tổng tiền tiệc"
+                    value={detail?.totalPrice}
+                    highlight
+                  />
+                </div>
+
+                <div className="pt-2 mt-2 border-t border-[#F1F2F6]">
+                  <PaymentRow label="Tổng đơn" value={order?.totalPrice} />
+                  <PaymentRow label="Đã đặt cọc" value={order?.depositAmount} />
+                  <PaymentRow
+                    label="Còn lại"
+                    value={order?.remainingAmount}
+                    highlight
+                  />
+                </div>
+              </div>
+            </div>
+
+            {(message || error) && (
+              <div className="rounded-2xl bg-white p-5">
+                {message ? (
+                  <div className="text-sm text-green-600">{message}</div>
+                ) : null}
+                {error ? (
+                  <div className="text-sm text-red-500">{error}</div>
+                ) : null}
+              </div>
+            )}
           </div>
 
           <div className="space-y-5">
@@ -774,32 +1077,65 @@ function OrderDetailPanel({
 
             <div className="rounded-2xl bg-white p-5">
               <div className="text-lg font-semibold text-[#2F3A67] mb-4">
-                Trạng thái OrderDetail
+                Trạng thái tiệc
               </div>
 
               <div className="mb-4">
-                <StatusBadge type="orderDetail" status={detail?.status} />
+                <StatusBadge type="orderDetail" status={detailStatus} />
               </div>
 
               <div className="space-y-4">
-                {buildOrderDetailStatusSteps(detail?.status).map(
-                  (step, index) => (
-                    <OrderStatusStep
-                      key={step.key}
-                      title={step.title}
-                      active={step.active}
-                      last={
-                        index ===
-                        buildOrderDetailStatusSteps(detail?.status).length - 1
-                      }
-                    />
-                  ),
-                )}
+                {statusSteps.map((step, index) => (
+                  <OrderStatusStep
+                    key={step.key}
+                    title={step.title}
+                    active={step.active}
+                    last={index === statusSteps.length - 1}
+                  />
+                ))}
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {openRejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
+            <div className="text-lg font-semibold text-[#2F3A67] mb-2">
+              Lý do từ chối
+            </div>
+            <div className="text-sm text-[#8DA1C1] mb-4">
+              Lý do sẽ được lưu vào ghi chú đơn hàng và gửi cho khách hàng.
+            </div>
+
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Nhập lý do từ chối..."
+              className="w-full rounded-2xl border border-[#E5E7EB] p-4 text-sm outline-none focus:border-red-400"
+              rows={5}
+            />
+
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                onClick={() => setOpenRejectModal(false)}
+                className="px-4 py-2 text-sm rounded-xl border border-[#D6DFEF]"
+              >
+                Hủy
+              </button>
+
+              <button
+                onClick={onReject}
+                disabled={!rejectReason.trim()}
+                className="px-4 py-2 text-sm rounded-xl bg-[#D64545] text-white disabled:opacity-50"
+              >
+                Xác nhận từ chối
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -816,20 +1152,15 @@ function InfoBox({ icon, label, value }) {
   );
 }
 
-function MiniInfo({ label, value }) {
+function PaymentRow({ label, value, highlight = false }) {
   return (
-    <div className="rounded-xl bg-[#F8F5F1] px-4 py-3">
-      <div className="text-xs text-[#8DA1C1]">{label}</div>
-      <div className="mt-1 font-medium text-[#2B2B2B]">{value}</div>
-    </div>
-  );
-}
-
-function PaymentRow({ label, value }) {
-  return (
-    <div className="flex items-center justify-between rounded-xl bg-[#F8F5F1] px-4 py-3">
-      <span className="text-sm text-[#8DA1C1]">{label}</span>
-      <span className="font-semibold text-[#2B2B2B]">{formatPrice(value)}</span>
+    <div className="flex items-center justify-between py-2">
+      <div className="text-sm text-[#6B7280]">{label}</div>
+      <div
+        className={`text-sm font-semibold ${highlight ? "text-[#E54B2D]" : "text-[#2B2B2B]"}`}
+      >
+        {formatPrice(value)}
+      </div>
     </div>
   );
 }
@@ -850,9 +1181,7 @@ function OrderStatusStep({ title, active, last }) {
 
         {!last ? (
           <div
-            className={`mt-2 h-10 w-[2px] ${
-              active ? "bg-[#BFDBFE]" : "bg-[#E5E7EB]"
-            }`}
+            className={`mt-2 h-10 w-[2px] ${active ? "bg-[#BFDBFE]" : "bg-[#E5E7EB]"}`}
           />
         ) : null}
       </div>

@@ -10,13 +10,17 @@ import {
   Filter,
   MapPin,
   Phone,
-  FileDown,
+  CalendarDays,
   Save,
   ChefHat,
   UtensilsCrossed,
   MessageCircle,
   Send,
   X,
+  ChevronDown,
+  Users,
+  Wallet,
+  Clock3,
 } from "lucide-react";
 
 export default function OwnerTrackingOrder() {
@@ -698,6 +702,7 @@ function OrderDetailPanel({
           : [];
   const menuBasePrice = Number(menuSnapshot?.basePrice || 0);
 
+  const [openMenu, setOpenMenu] = React.useState(false);
   const serviceTotal = Array.isArray(serviceSnapshot?.services)
     ? serviceSnapshot.services.reduce(
         (sum, s) => sum + Number(s.basePrice || 0) * Number(s.quantity || 1),
@@ -713,8 +718,15 @@ function OrderDetailPanel({
         0,
       )
     : 0;
-
   const extraCost = Number(detail?.extraChargeCost || 0);
+  const assignedStaffGroup =
+    staffGroups.find(
+      (group) => Number(group.staffGroupId) === Number(detail?.staffGroupId),
+    ) ||
+    staffGroups.find(
+      (group) => Number(group.staffGroupId) === Number(selectedStaffGroupId),
+    ) ||
+    null;
   return (
     <div className="space-y-5">
       <div className="rounded-2xl bg-white p-5">
@@ -750,8 +762,8 @@ function OrderDetailPanel({
               type="button"
               className="inline-flex items-center gap-2 rounded-xl border border-[#DCE6F7] px-4 py-2 text-sm text-[#6B8FFB] hover:bg-[#F8FBFF]"
             >
-              <FileDown className="h-4 w-4" />
-              Xuất file
+              <CalendarDays className="h-4 w-4" />
+              Lịch trình
             </button>
           </div>
         </div>
@@ -839,6 +851,13 @@ function OrderDetailPanel({
         <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr] gap-5">
           <div className="space-y-5">
             <div className="rounded-2xl bg-white p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="text-lg font-semibold text-[#2F3A67]">Menu</div>
+                <div className="text-xs font-medium text-[#8DA1C1]">
+                  {menuDishes.length} món
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-5 items-start">
                 <div className="h-[180px] overflow-hidden rounded-2xl bg-[#F5F5F5] border border-[#F1F2F6]">
                   {firstImage ? (
@@ -864,69 +883,100 @@ function OrderDetailPanel({
                   </div>
 
                   <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <MiniInfo
+                    <InfoBox
+                      icon={<Users className="h-4 w-4" />}
                       label="Số khách"
-                      value={detail?.numberOfGuests ?? "--"}
+                      value={`${detail?.numberOfGuests || 0} khách`}
                     />
-                    <MiniInfo label="Loại" value={getTypeLabel(detail?.type)} />
-                    <MiniInfo
+                    <InfoBox
+                      icon={<Wallet className="h-4 w-4" />}
+                      label="Giá menu"
+                      value={formatPrice(menuBasePrice)}
+                    />
+                    <InfoBox
+                      icon={<Clock3 className="h-4 w-4" />}
                       label="Bắt đầu"
                       value={formatDateTime(detail?.startTime)}
                     />
-                    <MiniInfo
+                    <InfoBox
+                      icon={<Clock3 className="h-4 w-4" />}
                       label="Kết thúc"
                       value={formatDateTime(detail?.endTime)}
                     />
                   </div>
-                  <div className="mt-4 rounded-xl bg-[#F8F5F1] px-4 py-3">
-                    <div className="text-xs text-[#8DA1C1]">
-                      Ghi chú của tiệc
+                </div>
+              </div>
+              <div className="mt-5 rounded-2xl border border-[#FDE7C7] bg-[#FFF9F2] px-5 py-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FFEAD5] text-[#E8712E]">
+                    <ClipboardList className="h-4 w-4" />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-[#B08968]">
+                        Ghi chú tiệc
+                      </span>
                     </div>
-                    <div className="mt-1 text-sm font-medium text-[#2B2B2B] whitespace-pre-wrap">
+
+                    <div className="mt-1 text-sm leading-6 text-[#5B4636] whitespace-pre-wrap break-words">
                       {detail?.noteOrderDetail ||
                         "Không có ghi chú riêng cho tiệc này."}
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+              <button
+                type="button"
+                onClick={() => setOpenMenu((prev) => !prev)}
+                className="mt-5 w-full rounded-2xl border border-[#EEF2F7] bg-[#FAFBFD] px-4 py-4 text-left transition hover:border-[#D9E4F5] hover:bg-[#F7F9FC]"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium uppercase tracking-wide text-[#8DA1C1]">
+                      Tên menu
+                    </div>
+                    <div className="mt-1 text-base font-semibold text-[#2B2B2B] break-words">
+                      {detail?.menuName || menuSnapshot?.menuName || "--"}
+                    </div>
+                  </div>
 
-            <div className="rounded-2xl bg-white p-5">
-              <div className="text-lg font-semibold text-[#2F3A67] mb-4">
-                Menu
-              </div>
-
-              <div className="rounded-xl bg-[#F8F5F1] px-4 py-3 mb-4">
-                <div className="text-sm text-[#8DA1C1]">Tên menu</div>
-                <div className="mt-1 font-semibold text-[#2B2B2B]">
-                  {detail?.menuName || menuSnapshot?.menuName || "--"}
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#8DA1C1] ring-1 ring-[#EEF2F7] transition-transform duration-200 ${
+                      openMenu ? "rotate-180" : ""
+                    }`}
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </div>
                 </div>
-              </div>
+              </button>
 
-              {menuDishes.length > 0 ? (
-                <div className="space-y-3">
-                  {menuDishes.map((dish) => (
-                    <div
-                      key={dish.dishId}
-                      className="flex items-center gap-3 rounded-xl bg-[#F8F5F1] px-4 py-3"
-                    >
-                      <div className="h-10 w-10 rounded-full bg-[#FFF1E8] flex items-center justify-center text-[#E8712E]">
-                        <ChefHat className="h-4 w-4" />
-                      </div>
+              {openMenu ? (
+                <div className="mt-4 space-y-3">
+                  {menuDishes.length > 0 ? (
+                    menuDishes.map((dish, index) => (
+                      <div
+                        key={dish.dishId || index}
+                        className="flex items-center gap-3 rounded-2xl border border-[#F1F2F6] bg-[#FFFDFC] px-4 py-3"
+                      >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FFF1E8] text-[#E8712E]">
+                          <ChefHat className="h-4 w-4" />
+                        </div>
 
-                      <div>
-                        <div className="font-medium text-[#2B2B2B]">
-                          {dish.dishName}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-[#2B2B2B] break-words">
+                            {dish.dishName}
+                          </div>
                         </div>
                       </div>
+                    ))
+                  ) : (
+                    <div className="rounded-xl bg-[#FAFBFD] px-4 py-3 text-sm text-gray-500">
+                      Không có món trong menu.
                     </div>
-                  ))}
+                  )}
                 </div>
-              ) : (
-                <div className="text-sm text-gray-500">
-                  Không có món trong menu.
-                </div>
-              )}
+              ) : null}
             </div>
 
             {Number(detail?.type) === 2 ? (
@@ -1130,29 +1180,70 @@ function OrderDetailPanel({
               </div>
             </div>
 
-            {canAssignStaffGroup ? (
-              <div className="rounded-2xl bg-white p-5">
-                <div className="text-lg font-semibold text-[#2F3A67] mb-3">
-                  Nhóm phụ trách
-                </div>
-
-                <select
-                  value={selectedStaffGroupId}
-                  onChange={(e) => setSelectedStaffGroupId(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-[#F8F5F1] px-4 py-3 text-sm outline-none"
-                >
-                  <option value="">
-                    {loadingStaffGroups ? "Đang tải nhóm..." : "Chưa phân công"}
-                  </option>
-                  {staffGroups.map((group) => (
-                    <option key={group.staffGroupId} value={group.staffGroupId}>
-                      {group.staffGroupName}
-                      {group.leaderName ? ` - ${group.leaderName}` : ""}
-                    </option>
-                  ))}
-                </select>
+            <div className="rounded-2xl bg-white p-5">
+              <div className="text-lg font-semibold text-[#2F3A67] mb-3">
+                Nhóm phụ trách
               </div>
-            ) : null}
+
+              {canAssignStaffGroup ? (
+                <>
+                  <select
+                    value={selectedStaffGroupId}
+                    onChange={(e) => setSelectedStaffGroupId(e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 bg-[#F8F5F1] px-4 py-3 text-sm outline-none"
+                  >
+                    <option value="">
+                      {loadingStaffGroups
+                        ? "Đang tải nhóm..."
+                        : "Chưa phân công"}
+                    </option>
+                    {staffGroups.map((group) => (
+                      <option
+                        key={group.staffGroupId}
+                        value={group.staffGroupId}
+                      >
+                        {group.staffGroupName}
+                        {group.leaderName ? ` - ${group.leaderName}` : ""}
+                      </option>
+                    ))}
+                  </select>
+
+                  {assignedStaffGroup ? (
+                    <div className="mt-3 rounded-xl border border-[#E5E7EB] bg-[#FAFBFD] px-4 py-3">
+                      <div className="text-xs text-[#8DA1C1]">
+                        Đang phụ trách
+                      </div>
+                      <div className="mt-1 font-semibold text-[#2F3A67]">
+                        {assignedStaffGroup.staffGroupName}
+                      </div>
+                      <div className="mt-1 text-sm text-[#6B7280]">
+                        {assignedStaffGroup.leaderName
+                          ? `Trưởng nhóm: ${assignedStaffGroup.leaderName}`
+                          : "Chưa có thông tin trưởng nhóm"}
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              ) : assignedStaffGroup ? (
+                <div className="rounded-xl border border-[#DCE6F7] bg-[#F8FBFF] px-4 py-4">
+                  <div className="text-xs font-medium text-[#8DA1C1]">
+                    Đang phụ trách
+                  </div>
+                  <div className="mt-1 text-base font-semibold text-[#2F3A67]">
+                    {assignedStaffGroup.staffGroupName}
+                  </div>
+                  <div className="mt-1 text-sm text-[#6B7280]">
+                    {assignedStaffGroup.leaderName
+                      ? `Trưởng nhóm: ${assignedStaffGroup.leaderName}`
+                      : "Chưa có thông tin trưởng nhóm"}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-[#E5E7EB] bg-[#FAFAFA] px-4 py-4 text-sm text-[#8DA1C1]">
+                  Chưa có nhóm phụ trách.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -1168,7 +1259,17 @@ function MiniInfo({ label, value }) {
     </div>
   );
 }
-
+function InfoBox({ icon, label, value }) {
+  return (
+    <div className="rounded-xl bg-[#F8F5F1] px-4 py-3">
+      <div className="flex items-center gap-2 text-[#8DA1C1] text-xs">
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div className="mt-2 font-medium text-[#2B2B2B]">{value}</div>
+    </div>
+  );
+}
 function PaymentRow({ label, value, rightText, highlight = false }) {
   return (
     <div className="flex items-center justify-between py-2">
