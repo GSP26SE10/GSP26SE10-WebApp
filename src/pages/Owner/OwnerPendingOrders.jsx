@@ -582,11 +582,6 @@ export default function OwnerPendingOrder() {
                               <div className="inline-flex items-center rounded-xl bg-[#F5F7FB] px-3 py-2 text-sm font-medium text-[#42526B]">
                                 {order.orderDetails?.length || 0} tiệc
                               </div>
-                              <div className="inline-flex items-center rounded-xl bg-[#FFF7ED] px-3 py-2 text-sm font-medium text-[#C2410C]">
-                                {formatDate(
-                                  detail?.startTime || order.createdAt,
-                                )}
-                              </div>
                             </div>
                           </div>
                         </div>

@@ -118,13 +118,13 @@ export default function Sidebar({ onExpandChange }) {
             label="Dịch vụ"
           />
           <SubItemLink
-            to="/owner/party"
+            to="/owner/party-category"
             expanded={expanded}
             icon={<Gift className="h-4 w-4" />}
             label="Tiệc"
           />
           <SubItemLink
-            to="/owner/inventory"
+            to="/owner/ingredient"
             expanded={expanded}
             icon={<Warehouse className="h-4 w-4" />}
             label="Kho"
