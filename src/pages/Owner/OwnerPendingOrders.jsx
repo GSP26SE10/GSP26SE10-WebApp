@@ -177,19 +177,6 @@ export default function OwnerPendingOrder() {
     selectedOrder?.orderDetails?.[0] ||
     null;
 
-  const stats = React.useMemo(
-    () => [
-      {
-        title: "Chờ duyệt",
-        value: orders.length,
-        icon: <ClipboardList className="h-5 w-5" />,
-        bg: "bg-amber-100",
-        text: "text-amber-600",
-      },
-    ],
-    [orders],
-  );
-
   const handleApproveOrder = async () => {
     if (!selectedOrder) return;
 
@@ -471,38 +458,31 @@ export default function OwnerPendingOrder() {
         />
 
         <main className="px-7 py-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-            {stats.map((item) => (
-              <div
-                key={item.title}
-                className="rounded-2xl bg-white px-6 py-5 flex items-center gap-4"
-              >
-                <div
-                  className={`h-12 w-12 rounded-full flex items-center justify-center ${item.bg} ${item.text}`}
-                >
-                  {item.icon}
-                </div>
-
-                <div>
-                  <div className="text-sm text-[#8DA1C1]">{item.title}</div>
-                  <div className="text-3xl font-bold text-[#1F2937]">
-                    {item.value}
-                  </div>
+          <div className="rounded-[28px] border border-[#ECE7DF] bg-white px-6 py-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <div className="text-sm text-[#8DA1C1]">Hàng đợi phê duyệt</div>
+                <div className="mt-1 text-3xl font-bold text-[#2F3A67]">
+                  {orders.length} đơn chờ duyệt
                 </div>
               </div>
-            ))}
+
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
+                  <ClipboardList className="h-5 w-5" />
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="mt-8">
-            <h1 className="text-[20px] font-bold text-[#E54B2D]">
-              Tất cả đơn hàng chờ duyệt
-            </h1>
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 xl:grid-cols-[360px_minmax(0,1fr)] gap-6 items-start xl:h-[calc(100vh-220px)]">
+          <div className="mt-6 grid grid-cols-1 xl:grid-cols-[340px_minmax(0,1fr)] gap-6 items-start xl:h-[calc(100vh-210px)]">
             <section className="min-h-0 xl:h-full flex flex-col">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-[28px] font-bold text-[#2F3A67]">Tất cả</h2>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-[24px] font-bold text-[#2F3A67]">
+                    Đơn đang chờ duyệt
+                  </h2>
+                </div>
 
                 <button
                   type="button"
@@ -513,7 +493,7 @@ export default function OwnerPendingOrder() {
                 </button>
               </div>
 
-              <div className="flex-1 min-h-0 overflow-y-auto hide-scrollbar space-y-4 pr-1">
+              <div className="flex-1 min-h-0 overflow-y-auto hide-scrollbar space-y-3 pr-1">
                 {loading ? (
                   <div className="rounded-2xl bg-white p-5 text-sm text-gray-500">
                     Đang tải đơn hàng...
@@ -539,27 +519,14 @@ export default function OwnerPendingOrder() {
                         key={order.orderId}
                         type="button"
                         onClick={() => setSelectedOrderId(order.orderId)}
-                        className={`w-full rounded-3xl border bg-white p-5 text-left transition-all duration-200 ${
+                        className={`w-full rounded-2xl border px-4 py-4 text-left transition-all ${
                           active
-                            ? "border-[#7CA3FF] shadow-[0_8px_30px_rgba(96,133,255,0.16)]"
-                            : "border-[#EEF2F7] hover:border-[#D9E4F5] hover:shadow-[0_6px_20px_rgba(15,23,42,0.06)]"
+                            ? "border-[#2F3A67] bg-[#F8FAFC] shadow-[0_10px_24px_rgba(15,23,42,0.08)]"
+                            : "border-[#ECEFF5] bg-white hover:border-[#D9E4F5]"
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="min-w-0">
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8DA1C1]">
-                              Đơn hàng
-                            </div>
-                            <div className="mt-1 text-base font-bold text-[#2F3A67]">
-                              #{String(order.orderId).padStart(3, "0")}
-                            </div>
-                          </div>
-
-                          <StatusBadge type="order" status={order.status} />
-                        </div>
-
-                        <div className="mt-4 grid grid-cols-[88px_minmax(0,1fr)] gap-4 items-start">
-                          <div className="h-[88px] w-[88px] overflow-hidden rounded-2xl bg-[#F6F7FB] ring-1 ring-[#EEF2F7]">
+                        <div className="flex items-start gap-3">
+                          <div className="h-14 w-14 overflow-hidden rounded-2xl bg-[#F6F7FB] shrink-0 ring-1 ring-[#EEF2F7]">
                             {firstImage ? (
                               <img
                                 src={firstImage}
@@ -567,50 +534,45 @@ export default function OwnerPendingOrder() {
                                 className="h-full w-full object-cover"
                               />
                             ) : (
-                              <div className="flex h-full w-full items-center justify-center text-[11px] text-gray-400">
+                              <div className="flex h-full w-full items-center justify-center text-[10px] text-gray-400">
                                 Không ảnh
                               </div>
                             )}
                           </div>
 
-                          <div className="min-w-0">
-                            <div className="text-[28px] leading-tight font-bold text-[#2B2B2B] break-words">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="font-bold text-[#2F3A67]">
+                                #{String(order.orderId).padStart(3, "0")}
+                              </div>
+                              <StatusBadge type="order" status={order.status} />
+                            </div>
+
+                            <div className="mt-1 text-base font-semibold text-[#2B2B2B] truncate">
                               {order.customerName || "--"}
                             </div>
 
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              <div className="inline-flex items-center rounded-xl bg-[#F5F7FB] px-3 py-2 text-sm font-medium text-[#42526B]">
-                                {order.orderDetails?.length || 0} tiệc
-                              </div>
+                            <div className="mt-1 text-sm text-[#8DA1C1] truncate">
+                              {detail?.menuName || "--"} •{" "}
+                              {order.orderDetails?.length || 0} tiệc
                             </div>
-                          </div>
-                        </div>
 
-                        <div className="mt-4 rounded-2xl bg-[#FAFBFD] px-4 py-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 text-[#6B8FFB]">
-                                <MapPin className="h-4 w-4 shrink-0" />
-                                <span className="text-xs font-medium text-[#9AA9C2]">
-                                  Địa chỉ
-                                </span>
-                              </div>
-
-                              <div className="mt-1 line-clamp-2 text-sm leading-6 text-[#2F3A67]">
+                            <div className="mt-2 flex items-center justify-between gap-3">
+                              <div className="min-w-0 text-xs text-[#6B7280] truncate">
                                 {detail?.address || "--"}
                               </div>
-                            </div>
 
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openCustomerChat(order);
-                              }}
-                              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#EAF2FF] text-[#6B8FFB] hover:bg-[#dfeaff]"
-                            >
-                              <MessageCircle className="h-4 w-4" />
-                            </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openCustomerChat(order);
+                                }}
+                                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EAF2FF] text-[#6B8FFB] hover:bg-[#dfeaff]"
+                              >
+                                <MessageCircle className="h-4 w-4" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </button>
@@ -705,20 +667,19 @@ function OrderDetailPanel({
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl bg-white p-5">
-        <div className="flex items-start justify-between gap-6">
+      <div className="rounded-[28px] border border-[#ECE7DF] bg-white p-6">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-[#2F3A67]">
-              Đơn hàng #{String(order.orderId).padStart(3, "0")}
-            </div>
-
-            <div className="mt-2 text-[38px] leading-none font-bold text-[#2B2B2B]">
+            <div className="mt-2 text-[34px] leading-tight font-bold text-[#2B2B2B]">
               {order.customerName || "--"}
             </div>
 
-            <div className="mt-2 text-xs text-[#8DA1C1]">
-              {formatTime(detail?.startTime || order.createdAt)} &nbsp; | &nbsp;
-              {formatDate(detail?.startTime || order.createdAt)}
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-[#8DA1C1]">
+              <span>#{String(order.orderId).padStart(3, "0")}</span>
+              <span>•</span>
+              <span>
+                {formatDateTime(detail?.startTime || order.createdAt)}
+              </span>
             </div>
           </div>
 
@@ -736,7 +697,7 @@ function OrderDetailPanel({
           </div>
         </div>
 
-        <div className="mt-4 w-full rounded-2xl border border-[#FDE7C7] bg-[#FFF9F2] px-5 py-4">
+        <div className="mt-5 rounded-2xl border border-[#FDE7C7] bg-[#FFF9F2] px-5 py-4">
           <div className="flex items-start gap-3">
             <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FFEAD5] text-[#E8712E]">
               <AlertTriangle className="h-4 w-4" />
@@ -757,9 +718,16 @@ function OrderDetailPanel({
       </div>
 
       {hasMultipleDetails ? (
-        <div className="rounded-2xl bg-white p-5">
-          <div className="text-lg font-semibold text-[#2F3A67] mb-4">
-            Danh sách tiệc
+        <div className="rounded-[24px] border border-[#ECEFF5] bg-white p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-[0.14em] text-[#8DA1C1]">
+                Party items
+              </div>
+              <div className="mt-1 text-lg font-semibold text-[#2F3A67]">
+                Danh sách tiệc
+              </div>
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -771,9 +739,9 @@ function OrderDetailPanel({
                   key={item.orderDetailId}
                   type="button"
                   onClick={() => setSelectedOrderDetailId(item.orderDetailId)}
-                  className={`w-full rounded-xl border px-4 py-3 text-left transition ${
+                  className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
                     active
-                      ? "border-[#7CA3FF] bg-[#F8FBFF]"
+                      ? "border-[#2F3A67] bg-[#F8FAFC]"
                       : "border-[#E5E7EB] bg-white hover:bg-[#FAFAFA]"
                   }`}
                 >
@@ -800,9 +768,16 @@ function OrderDetailPanel({
         </div>
       ) : null}
 
-      <div>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-[30px] font-bold text-[#2F3A67]">Chi tiết</h3>
+      <div className="sticky top-4 z-10 rounded-2xl border border-[#E5E7EB] bg-white/95 backdrop-blur px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-[#2F3A67]">
+              Quyết định đơn hàng
+            </div>
+            <div className="text-xs text-[#8DA1C1]">
+              Xác nhận thông tin trước khi duyệt hoặc từ chối
+            </div>
+          </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <button
@@ -826,269 +801,278 @@ function OrderDetailPanel({
             </button>
           </div>
         </div>
+      </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr] gap-5">
-          <div className="space-y-5">
-            <div className="rounded-2xl bg-white p-5">
-              <div className="mb-4 flex items-center justify-between">
-                <div className="text-lg font-semibold text-[#2F3A67]">Menu</div>
-                <div className="text-xs font-medium text-[#8DA1C1]">
-                  {menuDishes.length} món
+      <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-5">
+        <div className="space-y-5">
+          <div className="rounded-[24px] border border-[#ECEFF5] bg-white p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <div className="mt-1 text-lg font-semibold text-[#2F3A67]">
+                  Menu
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-5 items-start">
-                <div className="h-[180px] overflow-hidden rounded-2xl bg-[#F5F5F5] border border-[#F1F2F6]">
-                  {firstImage ? (
-                    <img
-                      src={firstImage}
-                      alt={detail?.menuName || "menu"}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="h-full w-full flex items-center justify-center text-sm text-gray-400">
-                      Không có ảnh
-                    </div>
-                  )}
+              <div className="text-xs font-medium text-[#8DA1C1]">
+                {menuDishes.length} món
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-5 items-start">
+              <div className="h-[180px] overflow-hidden rounded-2xl bg-[#F5F5F5] border border-[#F1F2F6]">
+                {firstImage ? (
+                  <img
+                    src={firstImage}
+                    alt={detail?.menuName || "menu"}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center text-sm text-gray-400">
+                    Không có ảnh
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="text-[24px] font-bold text-[#2F3A67]">
+                  {detail?.menuName || menuSnapshot?.menuName || "--"}
                 </div>
 
-                <div>
-                  <div className="text-[24px] font-bold text-[#2F3A67]">
+                <div className="mt-2 text-sm text-[#8DA1C1]">
+                  {detail?.partyCategoryName || "--"}
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <InfoBox
+                    icon={<Users className="h-4 w-4" />}
+                    label="Số khách"
+                    value={`${detail?.numberOfGuests || 0} khách`}
+                  />
+                  <InfoBox
+                    icon={<Wallet className="h-4 w-4" />}
+                    label="Giá menu"
+                    value={formatPrice(menuBasePrice)}
+                  />
+                  <InfoBox
+                    icon={<Clock3 className="h-4 w-4" />}
+                    label="Bắt đầu"
+                    value={formatDateTime(detail?.startTime)}
+                  />
+                  <InfoBox
+                    icon={<Clock3 className="h-4 w-4" />}
+                    label="Kết thúc"
+                    value={formatDateTime(detail?.endTime)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 w-full rounded-2xl border border-[#FDE7C7] bg-[#FFF9F2] px-5 py-4">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FFEAD5] text-[#E8712E]">
+                  <ClipboardList className="h-4 w-4" />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-[#B08968]">
+                    Ghi chú tiệc
+                  </div>
+
+                  <div className="mt-1 text-sm leading-6 text-[#5B4636] whitespace-pre-wrap break-words">
+                    {detail?.noteOrderDetail ||
+                      "Không có ghi chú riêng cho tiệc này."}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setOpenMenu((prev) => !prev)}
+              className="mt-5 w-full rounded-2xl border border-[#EEF2F7] bg-[#FAFBFD] px-4 py-4 text-left transition hover:border-[#D9E4F5] hover:bg-[#F7F9FC]"
+            >
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="text-xs font-medium uppercase tracking-wide text-[#8DA1C1]">
+                    Tên menu
+                  </div>
+                  <div className="mt-1 text-base font-semibold text-[#2B2B2B] break-words">
                     {detail?.menuName || menuSnapshot?.menuName || "--"}
                   </div>
+                </div>
 
-                  <div className="mt-2 text-sm text-[#8DA1C1]">
-                    {detail?.partyCategoryName || "--"}
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <InfoBox
-                      icon={<Users className="h-4 w-4" />}
-                      label="Số khách"
-                      value={`${detail?.numberOfGuests || 0} khách`}
-                    />
-                    <InfoBox
-                      icon={<Wallet className="h-4 w-4" />}
-                      label="Giá menu"
-                      value={formatPrice(menuBasePrice)}
-                    />
-                    <InfoBox
-                      icon={<Clock3 className="h-4 w-4" />}
-                      label="Bắt đầu"
-                      value={formatDateTime(detail?.startTime)}
-                    />
-                    <InfoBox
-                      icon={<Clock3 className="h-4 w-4" />}
-                      label="Kết thúc"
-                      value={formatDateTime(detail?.endTime)}
-                    />
-                  </div>
+                <div
+                  className={`flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#8DA1C1] ring-1 ring-[#EEF2F7] transition-transform duration-200 ${
+                    openMenu ? "rotate-180" : ""
+                  }`}
+                >
+                  <ChevronDown className="h-4 w-4" />
                 </div>
               </div>
+            </button>
 
-              <div className="mt-4 w-full rounded-2xl border border-[#FDE7C7] bg-[#FFF9F2] px-5 py-4">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FFEAD5] text-[#E8712E]">
-                    <ClipboardList className="h-4 w-4" />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-[#B08968]">
-                      Ghi chú tiệc
-                    </div>
-
-                    <div className="mt-1 text-sm leading-6 text-[#5B4636] whitespace-pre-wrap break-words">
-                      {detail?.noteOrderDetail ||
-                        "Không có ghi chú riêng cho tiệc này."}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setOpenMenu((prev) => !prev)}
-                className="mt-5 w-full rounded-2xl border border-[#EEF2F7] bg-[#FAFBFD] px-4 py-4 text-left transition hover:border-[#D9E4F5] hover:bg-[#F7F9FC]"
-              >
-                <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="text-xs font-medium uppercase tracking-wide text-[#8DA1C1]">
-                      Tên menu
-                    </div>
-                    <div className="mt-1 text-base font-semibold text-[#2B2B2B] break-words">
-                      {detail?.menuName || menuSnapshot?.menuName || "--"}
-                    </div>
-                  </div>
-
-                  <div
-                    className={`flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#8DA1C1] ring-1 ring-[#EEF2F7] transition-transform duration-200 ${
-                      openMenu ? "rotate-180" : ""
-                    }`}
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </div>
-                </div>
-              </button>
-
-              {openMenu ? (
-                <div className="mt-4 space-y-3">
-                  {menuDishes.length > 0 ? (
-                    menuDishes.map((dish, index) => (
-                      <div
-                        key={dish.dishId || index}
-                        className="flex items-center gap-3 rounded-2xl border border-[#F1F2F6] bg-[#FFFDFC] px-4 py-3"
-                      >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FFF1E8] text-[#E8712E]">
-                          <ChefHat className="h-4 w-4" />
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-[#2B2B2B] break-words">
-                            {dish.dishName}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="rounded-xl bg-[#FAFBFD] px-4 py-3 text-sm text-gray-500">
-                      Không có món trong menu.
-                    </div>
-                  )}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="rounded-2xl bg-white p-5">
-              <div className="text-lg font-semibold text-[#2F3A67] mb-4">
-                Dịch vụ đi kèm
-              </div>
-
-              {Array.isArray(serviceSnapshot?.services) &&
-              serviceSnapshot.services.length > 0 ? (
-                <div className="space-y-3">
-                  {serviceSnapshot.services.map((service) => (
+            {openMenu ? (
+              <div className="mt-4 space-y-3">
+                {menuDishes.length > 0 ? (
+                  menuDishes.map((dish, index) => (
                     <div
-                      key={service.serviceId}
-                      className="flex items-center justify-between rounded-xl bg-[#F8F5F1] px-4 py-3"
+                      key={dish.dishId || index}
+                      className="flex items-center gap-3 rounded-2xl border border-[#F1F2F6] bg-[#FFFDFC] px-4 py-3"
                     >
-                      <div>
-                        <div className="font-medium text-[#2B2B2B]">
-                          {service.serviceName}
-                        </div>
-                        <div className="text-sm text-[#8DA1C1]">
-                          Số lượng: {service.quantity || 1}
-                        </div>
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FFF1E8] text-[#E8712E]">
+                        <ChefHat className="h-4 w-4" />
                       </div>
-                      <div className="font-semibold text-[#2F3A67]">
-                        {formatPrice(service.basePrice)}
+
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold text-[#2B2B2B] break-words">
+                          {dish.dishName}
+                        </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500">
-                  Không có dịch vụ đi kèm.
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-2xl bg-white p-5">
-              <div className="text-lg font-semibold text-[#2F3A67] mb-4">
-                Thông tin thanh toán
-              </div>
-
-              <div className="space-y-2">
-                <PaymentRow
-                  label="Menu"
-                  value={menuBasePrice * Number(detail?.numberOfGuests || 0)}
-                />
-                <PaymentRow label="Dịch vụ đi kèm" value={serviceTotal} />
-                {extraCost > 0 && (
-                  <PaymentRow label="Chi phí phát sinh" value={extraCost} />
+                  ))
+                ) : (
+                  <div className="rounded-xl bg-[#FAFBFD] px-4 py-3 text-sm text-gray-500">
+                    Không có món trong menu.
+                  </div>
                 )}
-
-                <div className="pt-2 mt-2 border-t border-[#F1F2F6]">
-                  <PaymentRow
-                    label="Tổng tiền tiệc"
-                    value={detail?.totalPrice}
-                    highlight
-                  />
-                </div>
-
-                <div className="pt-2 mt-2 border-t border-[#F1F2F6]">
-                  <PaymentRow label="Tổng đơn" value={order?.totalPrice} />
-                  <PaymentRow label="Đã đặt cọc" value={order?.depositAmount} />
-                  <PaymentRow
-                    label="Còn lại"
-                    value={order?.remainingAmount}
-                    highlight
-                  />
-                </div>
               </div>
+            ) : null}
+          </div>
+
+          <div className="rounded-[24px] border border-[#ECEFF5] bg-white p-5">
+            <div className="mt-1 text-lg font-semibold text-[#2F3A67] mb-4">
+              Dịch vụ đi kèm
             </div>
 
-            {(message || error) && (
-              <div className="rounded-2xl bg-white p-5">
-                {message ? (
-                  <div className="text-sm text-green-600">{message}</div>
-                ) : null}
-                {error ? (
-                  <div className="text-sm text-red-500">{error}</div>
-                ) : null}
+            {Array.isArray(serviceSnapshot?.services) &&
+            serviceSnapshot.services.length > 0 ? (
+              <div className="space-y-3">
+                {serviceSnapshot.services.map((service) => (
+                  <div
+                    key={service.serviceId}
+                    className="flex items-center justify-between rounded-xl bg-[#F8F5F1] px-4 py-3"
+                  >
+                    <div>
+                      <div className="font-medium text-[#2B2B2B]">
+                        {service.serviceName}
+                      </div>
+                      <div className="text-sm text-[#8DA1C1]">
+                        Số lượng: {service.quantity || 1}
+                      </div>
+                    </div>
+                    <div className="font-semibold text-[#2F3A67]">
+                      {formatPrice(service.basePrice)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-gray-500">
+                Không có dịch vụ đi kèm.
               </div>
             )}
           </div>
 
-          <div className="space-y-5">
-            <div className="rounded-2xl bg-white p-5">
-              <div className="h-[280px] overflow-hidden rounded-2xl bg-[#F5F5F5]">
-                {mapSrc ? (
-                  <iframe
-                    title="Google Map"
-                    src={mapSrc}
-                    className="h-full w-full border-0"
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
-                ) : (
-                  <div className="h-full w-full flex items-center justify-center text-sm text-gray-400">
-                    Không có bản đồ
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-4">
-                <div className="flex items-center gap-2 text-[#6B8FFB]">
-                  <MapPin className="h-4 w-4" />
-                  <span className="font-medium text-[#2F3A67]">
-                    {detail?.address || "--"}
-                  </span>
-                </div>
-                <div className="mt-1 text-xs text-[#B4BED1]">
-                  {formatDateTime(detail?.startTime)}
-                </div>
-              </div>
+          <div className="rounded-[24px] border border-[#ECEFF5] bg-white p-5">
+            <div className="mt-1 text-lg font-semibold text-[#2F3A67] mb-4">
+              Thông tin thanh toán
             </div>
 
-            <div className="rounded-2xl bg-white p-5">
-              <div className="text-lg font-semibold text-[#2F3A67] mb-4">
-                Trạng thái tiệc
+            <div className="space-y-2">
+              <PaymentRow
+                label="Menu"
+                value={menuBasePrice * Number(detail?.numberOfGuests || 0)}
+              />
+              <PaymentRow label="Dịch vụ đi kèm" value={serviceTotal} />
+              {extraCost > 0 && (
+                <PaymentRow label="Chi phí phát sinh" value={extraCost} />
+              )}
+
+              <div className="pt-2 mt-2 border-t border-[#F1F2F6]">
+                <PaymentRow
+                  label="Tổng tiền tiệc"
+                  value={detail?.totalPrice}
+                  highlight
+                />
               </div>
 
-              <div className="mb-4">
-                <StatusBadge type="orderDetail" status={detailStatus} />
+              <div className="pt-2 mt-2 border-t border-[#F1F2F6]">
+                <PaymentRow label="Tổng đơn" value={order?.totalPrice} />
+                <PaymentRow label="Đã đặt cọc" value={order?.depositAmount} />
+                <PaymentRow
+                  label="Còn lại"
+                  value={order?.remainingAmount}
+                  highlight
+                />
               </div>
+            </div>
+          </div>
 
-              <div className="space-y-4">
-                {statusSteps.map((step, index) => (
-                  <OrderStatusStep
-                    key={step.key}
-                    title={step.title}
-                    active={step.active}
-                    last={index === statusSteps.length - 1}
-                  />
-                ))}
+          {(message || error) && (
+            <div className="rounded-[24px] border border-[#ECEFF5] bg-white p-5">
+              {message ? (
+                <div className="text-sm text-green-600">{message}</div>
+              ) : null}
+              {error ? (
+                <div className="text-sm text-red-500">{error}</div>
+              ) : null}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-5">
+          <div className="rounded-[24px] border border-[#ECEFF5] bg-white p-5">
+            <div className="mt-1 text-lg font-semibold text-[#2F3A67] mb-4">
+              Địa điểm tổ chức
+            </div>
+
+            <div className="h-[280px] overflow-hidden rounded-2xl bg-[#F5F5F5]">
+              {mapSrc ? (
+                <iframe
+                  title="Google Map"
+                  src={mapSrc}
+                  className="h-full w-full border-0"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              ) : (
+                <div className="h-full w-full flex items-center justify-center text-sm text-gray-400">
+                  Không có bản đồ
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4">
+              <div className="flex items-center gap-2 text-[#6B8FFB]">
+                <MapPin className="h-4 w-4" />
+                <span className="font-medium text-[#2F3A67]">
+                  {detail?.address || "--"}
+                </span>
               </div>
+              <div className="mt-1 text-xs text-[#B4BED1]">
+                {formatDateTime(detail?.startTime)}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[24px] border border-[#ECEFF5] bg-white p-5">
+            <div className="mt-1 text-lg font-semibold text-[#2F3A67] mb-4">
+              Trạng thái tiệc
+            </div>
+
+            <div className="mb-4">
+              <StatusBadge type="orderDetail" status={detailStatus} />
+            </div>
+
+            <div className="space-y-4">
+              {statusSteps.map((step, index) => (
+                <OrderStatusStep
+                  key={step.key}
+                  title={step.title}
+                  active={step.active}
+                  last={index === statusSteps.length - 1}
+                />
+              ))}
             </div>
           </div>
         </div>
@@ -1152,7 +1136,9 @@ function PaymentRow({ label, value, highlight = false }) {
     <div className="flex items-center justify-between py-2">
       <div className="text-sm text-[#6B7280]">{label}</div>
       <div
-        className={`text-sm font-semibold ${highlight ? "text-[#E54B2D]" : "text-[#2B2B2B]"}`}
+        className={`text-sm font-semibold ${
+          highlight ? "text-[#E54B2D]" : "text-[#2B2B2B]"
+        }`}
       >
         {formatPrice(value)}
       </div>
@@ -1176,7 +1162,9 @@ function OrderStatusStep({ title, active, last }) {
 
         {!last ? (
           <div
-            className={`mt-2 h-10 w-[2px] ${active ? "bg-[#BFDBFE]" : "bg-[#E5E7EB]"}`}
+            className={`mt-2 h-10 w-[2px] ${
+              active ? "bg-[#BFDBFE]" : "bg-[#E5E7EB]"
+            }`}
           />
         ) : null}
       </div>

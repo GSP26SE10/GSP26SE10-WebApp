@@ -461,7 +461,6 @@ export default function OwnerStaffManagement() {
         throw new Error("Không xác định được ID nhóm sau khi lưu");
       }
 
-      // Đồng bộ member nhóm theo lựa chọn
       const exMembers = members.filter(
         (m) => Number(m.staffGroupId) === Number(groupId),
       );
@@ -1011,7 +1010,7 @@ function UserTable({
                   {item.fullName || "--"}
                 </div>
                 <div className="mt-1 text-xs text-[#8DA1C1]">
-                  @{item.userName} • ID #{item.userId}
+                  {item.userName}
                 </div>
               </BodyCell>
               <BodyCell>

@@ -9,14 +9,11 @@ import {
   XCircle,
   Filter,
   MapPin,
-  Phone,
   CalendarDays,
   Save,
   ChefHat,
   UtensilsCrossed,
   MessageCircle,
-  Send,
-  X,
   ChevronDown,
   Users,
   Wallet,
@@ -36,6 +33,7 @@ export default function OwnerTrackingOrder() {
   const [selectedOrderDetailId, setSelectedOrderDetailId] =
     React.useState(null);
   const [search, setSearch] = React.useState("");
+  const [activeTab, setActiveTab] = React.useState("pending_assign");
 
   const [staffGroups, setStaffGroups] = React.useState([]);
   const [loadingStaffGroups, setLoadingStaffGroups] = React.useState(false);
@@ -70,25 +68,14 @@ export default function OwnerTrackingOrder() {
       }
 
       const items = Array.isArray(data?.items) ? data.items : [];
-      const trackingOrders = items.filter((item) => Number(item.status) !== 1);
-
-      setOrders(trackingOrders);
-
-      if (trackingOrders.length > 0) {
-        setSelectedOrderId((prev) => {
-          const exists = trackingOrders.some((item) => item.orderId === prev);
-          return exists ? prev : trackingOrders[0].orderId;
-        });
-      } else {
-        setSelectedOrderId(null);
-        setSelectedOrderDetailId(null);
-      }
+      setOrders(items);
     } catch (err) {
       setError(err.message || "Đã có lỗi xảy ra");
     } finally {
       setLoading(false);
     }
   }, [token]);
+
   const ownerId = React.useMemo(() => {
     const userRaw =
       localStorage.getItem("userId") || sessionStorage.getItem("userId");
@@ -102,6 +89,7 @@ export default function OwnerTrackingOrder() {
       return null;
     }
   }, []);
+
   const fetchStaffGroups = React.useCallback(async () => {
     setLoadingStaffGroups(true);
 
@@ -135,6 +123,7 @@ export default function OwnerTrackingOrder() {
   React.useEffect(() => {
     fetchStaffGroups();
   }, [fetchStaffGroups]);
+
   const openCustomerChat = async (order) => {
     if (!order?.customerId) {
       setChatError("Không tìm thấy khách hàng.");
@@ -254,6 +243,7 @@ export default function OwnerTrackingOrder() {
       setChatLoading(false);
     }
   };
+
   const handleSendMessage = async () => {
     const content = chatInput.trim();
 
@@ -301,11 +291,76 @@ export default function OwnerTrackingOrder() {
       setSendingMessage(false);
     }
   };
+
+  const tabs = React.useMemo(
+    () => [
+      {
+        key: "pending_assign",
+        title: "Chờ phân công",
+        heading: "Chờ phân công",
+        value: orders.filter((o) => Number(o.status) === 2).length,
+        icon: <CheckCircle2 className="h-5 w-5" />,
+        bg: "bg-green-100",
+        text: "text-green-600",
+      },
+      {
+        key: "processing",
+        title: "Đang xử lý",
+        heading: "Đang xử lý",
+        value: orders.filter((o) => [4, 5, 6].includes(Number(o.status)))
+          .length,
+        icon: <ClipboardList className="h-5 w-5" />,
+        bg: "bg-blue-100",
+        text: "text-blue-600",
+      },
+      {
+        key: "completed",
+        title: "Hoàn thành",
+        heading: "Hoàn thành",
+        value: orders.filter((o) => Number(o.status) === 7).length,
+        icon: <CheckCircle2 className="h-5 w-5" />,
+        bg: "bg-emerald-100",
+        text: "text-emerald-600",
+      },
+      {
+        key: "rejected_cancelled",
+        title: "Từ chối / Hủy",
+        heading: "Từ chối / hủy",
+        value: orders.filter((o) => [3, 8].includes(Number(o.status))).length,
+        icon: <XCircle className="h-5 w-5" />,
+        bg: "bg-rose-100",
+        text: "text-rose-600",
+      },
+    ],
+    [orders],
+  );
+
+  const activeTabInfo = tabs.find((item) => item.key === activeTab) || tabs[0];
+
+  const tabFilteredOrders = React.useMemo(() => {
+    switch (activeTab) {
+      case "pending_assign":
+        return orders.filter((o) => Number(o.status) === 2);
+
+      case "processing":
+        return orders.filter((o) => [4, 5, 6].includes(Number(o.status)));
+
+      case "completed":
+        return orders.filter((o) => Number(o.status) === 7);
+
+      case "rejected_cancelled":
+        return orders.filter((o) => [3, 8].includes(Number(o.status)));
+
+      default:
+        return orders;
+    }
+  }, [orders, activeTab]);
+
   const filteredOrders = React.useMemo(() => {
     const keyword = search.trim().toLowerCase();
-    if (!keyword) return orders;
+    if (!keyword) return tabFilteredOrders;
 
-    return orders.filter((order) => {
+    return tabFilteredOrders.filter((order) => {
       const details = Array.isArray(order.orderDetails)
         ? order.orderDetails
         : [];
@@ -332,7 +387,19 @@ export default function OwnerTrackingOrder() {
 
       return matchOrder || matchDetail;
     });
-  }, [orders, search]);
+  }, [tabFilteredOrders, search]);
+
+  React.useEffect(() => {
+    if (filteredOrders.length > 0) {
+      setSelectedOrderId((prev) => {
+        const exists = filteredOrders.some((item) => item.orderId === prev);
+        return exists ? prev : filteredOrders[0].orderId;
+      });
+    } else {
+      setSelectedOrderId(null);
+      setSelectedOrderDetailId(null);
+    }
+  }, [filteredOrders]);
 
   const selectedOrder =
     filteredOrders.find((order) => order.orderId === selectedOrderId) ||
@@ -362,41 +429,6 @@ export default function OwnerTrackingOrder() {
       selectedDetail?.staffGroupId ? String(selectedDetail.staffGroupId) : "",
     );
   }, [selectedDetail]);
-
-  const stats = React.useMemo(
-    () => [
-      {
-        title: "Chờ phân công",
-        value: orders.filter((o) => Number(o.status) === 2).length,
-        icon: <CheckCircle2 className="h-5 w-5" />,
-        bg: "bg-green-100",
-        text: "text-green-600",
-      },
-      {
-        title: "Đang xử lý",
-        value: orders.filter((o) => [4, 5, 6].includes(Number(o.status)))
-          .length,
-        icon: <ClipboardList className="h-5 w-5" />,
-        bg: "bg-blue-100",
-        text: "text-blue-600",
-      },
-      {
-        title: "Hoàn thành",
-        value: orders.filter((o) => Number(o.status) === 7).length,
-        icon: <CheckCircle2 className="h-5 w-5" />,
-        bg: "bg-emerald-100",
-        text: "text-emerald-600",
-      },
-      {
-        title: "Từ chối / Hủy",
-        value: orders.filter((o) => [3, 8].includes(Number(o.status))).length,
-        icon: <XCircle className="h-5 w-5" />,
-        bg: "bg-rose-100",
-        text: "text-rose-600",
-      },
-    ],
-    [orders],
-  );
 
   const handleAssignStaffGroup = async () => {
     if (!selectedOrder || !selectedDetail) return;
@@ -475,37 +507,43 @@ export default function OwnerTrackingOrder() {
 
         <main className="px-7 py-6">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-            {stats.map((item) => (
-              <div
-                key={item.title}
-                className="rounded-2xl bg-white px-6 py-5 flex items-center gap-4"
-              >
-                <div
-                  className={`h-12 w-12 rounded-full flex items-center justify-center ${item.bg} ${item.text}`}
+            {tabs.map((item) => {
+              const active = activeTab === item.key;
+
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setActiveTab(item.key)}
+                  className={`rounded-2xl bg-white px-6 py-5 flex items-center gap-4 text-left border transition-all ${
+                    active
+                      ? "border-[#7CA3FF] shadow-[0_8px_30px_rgba(96,133,255,0.16)]"
+                      : "border-transparent hover:border-[#D9E4F5]"
+                  }`}
                 >
-                  {item.icon}
-                </div>
-
-                <div>
-                  <div className="text-sm text-[#8DA1C1]">{item.title}</div>
-                  <div className="text-3xl font-bold text-[#1F2937]">
-                    {item.value}
+                  <div
+                    className={`h-12 w-12 rounded-full flex items-center justify-center ${item.bg} ${item.text}`}
+                  >
+                    {item.icon}
                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
 
-          <div className="mt-8">
-            <h1 className="text-[20px] font-bold text-[#E54B2D]">
-              Tất cả Đơn hàng theo dõi
-            </h1>
+                  <div>
+                    <div className="text-sm text-[#8DA1C1]">{item.title}</div>
+                    <div className="text-3xl font-bold text-[#1F2937]">
+                      {item.value}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
           <div className="mt-6 grid grid-cols-1 xl:grid-cols-[360px_minmax(0,1fr)] gap-6 items-start xl:h-[calc(100vh-220px)]">
             <section className="min-h-0 xl:h-full flex flex-col">
               <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-[28px] font-bold text-[#2F3A67]">Tất cả</h2>
+                <h2 className="text-[28px] font-bold text-[#2F3A67]">
+                  {activeTabInfo.heading}
+                </h2>
 
                 <button
                   type="button"
@@ -527,7 +565,7 @@ export default function OwnerTrackingOrder() {
                   </div>
                 ) : filteredOrders.length === 0 ? (
                   <div className="rounded-2xl bg-white p-5 text-sm text-gray-500">
-                    Không có đơn hàng theo dõi.
+                    Không có {activeTabInfo.heading.toLowerCase()}.
                   </div>
                 ) : (
                   filteredOrders.map((order) => {
@@ -700,9 +738,11 @@ function OrderDetailPanel({
         : Array.isArray(detail?.additionalDishes)
           ? detail.additionalDishes
           : [];
+
   const menuBasePrice = Number(menuSnapshot?.basePrice || 0);
 
   const [openMenu, setOpenMenu] = React.useState(false);
+
   const serviceTotal = Array.isArray(serviceSnapshot?.services)
     ? serviceSnapshot.services.reduce(
         (sum, s) => sum + Number(s.basePrice || 0) * Number(s.quantity || 1),
@@ -718,7 +758,9 @@ function OrderDetailPanel({
         0,
       )
     : 0;
+
   const extraCost = Number(detail?.extraChargeCost || 0);
+
   const assignedStaffGroup =
     staffGroups.find(
       (group) => Number(group.staffGroupId) === Number(detail?.staffGroupId),
@@ -727,6 +769,7 @@ function OrderDetailPanel({
       (group) => Number(group.staffGroupId) === Number(selectedStaffGroupId),
     ) ||
     null;
+
   return (
     <div className="space-y-5">
       <div className="rounded-2xl bg-white p-5">
@@ -834,18 +877,6 @@ function OrderDetailPanel({
       <div>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-[30px] font-bold text-[#2F3A67]">Chi tiết</h3>
-
-          {canAssignStaffGroup ? (
-            <button
-              type="button"
-              onClick={onAssign}
-              disabled={assigning}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#2F3A67] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
-            >
-              <Save className="h-4 w-4" />
-              {assigning ? "Đang gán..." : "Gán nhóm phụ trách"}
-            </button>
-          ) : null}
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr] gap-5">
@@ -906,6 +937,7 @@ function OrderDetailPanel({
                   </div>
                 </div>
               </div>
+
               <div className="mt-5 rounded-2xl border border-[#FDE7C7] bg-[#FFF9F2] px-5 py-4">
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FFEAD5] text-[#E8712E]">
@@ -926,6 +958,7 @@ function OrderDetailPanel({
                   </div>
                 </div>
               </div>
+
               <button
                 type="button"
                 onClick={() => setOpenMenu((prev) => !prev)}
@@ -1050,6 +1083,7 @@ function OrderDetailPanel({
                 </div>
               )}
             </div>
+
             <div className="rounded-2xl bg-white p-5">
               <div className="text-lg font-semibold text-[#2F3A67] mb-4">
                 Thông tin thanh toán
@@ -1089,6 +1123,7 @@ function OrderDetailPanel({
                   type="dish"
                   guestCount={detail?.numberOfGuests || 0}
                 />
+
                 <PaymentGroup
                   label="Dịch vụ"
                   total={serviceTotal}
@@ -1119,6 +1154,7 @@ function OrderDetailPanel({
                 </div>
               </div>
             </div>
+
             {(message || error) && (
               <div className="rounded-2xl bg-white p-5">
                 {message ? (
@@ -1244,6 +1280,20 @@ function OrderDetailPanel({
                 </div>
               )}
             </div>
+
+            <div className="flex justify-end">
+              {canAssignStaffGroup ? (
+                <button
+                  type="button"
+                  onClick={onAssign}
+                  disabled={assigning}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#2F3A67] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                >
+                  <Save className="h-4 w-4" />
+                  {assigning ? "Đang gán..." : "Gán nhóm phụ trách"}
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
@@ -1251,14 +1301,6 @@ function OrderDetailPanel({
   );
 }
 
-function MiniInfo({ label, value }) {
-  return (
-    <div className="rounded-xl bg-[#F8F5F1] px-4 py-3">
-      <div className="text-xs text-[#8DA1C1]">{label}</div>
-      <div className="mt-1 font-medium text-[#2B2B2B]">{value}</div>
-    </div>
-  );
-}
 function InfoBox({ icon, label, value }) {
   return (
     <div className="rounded-xl bg-[#F8F5F1] px-4 py-3">
@@ -1270,6 +1312,7 @@ function InfoBox({ icon, label, value }) {
     </div>
   );
 }
+
 function PaymentRow({ label, value, rightText, highlight = false }) {
   return (
     <div className="flex items-center justify-between py-2">
@@ -1293,6 +1336,7 @@ function PaymentRow({ label, value, rightText, highlight = false }) {
     </div>
   );
 }
+
 function PaymentGroup({ label, total, items, type, guestCount = 0 }) {
   return (
     <div className="py-2">
@@ -1349,6 +1393,7 @@ function PaymentGroup({ label, total, items, type, guestCount = 0 }) {
     </div>
   );
 }
+
 function OrderStatusStep({ title, active, last }) {
   return (
     <div className="flex items-start gap-3">
@@ -1504,14 +1549,6 @@ function buildOrderDetailStatusSteps(status) {
     { key: "inProgress", title: "Đang thực hiện", active: value >= 5 },
     { key: "completed", title: "Hoàn thành", active: value >= 6 },
   ];
-}
-
-function getTypeLabel(type) {
-  const value = Number(type);
-
-  if (value === 1) return "Đặt theo menu";
-  if (value === 2) return "Tùy chỉnh";
-  return "--";
 }
 
 function getFirstImage(imgUrl) {
