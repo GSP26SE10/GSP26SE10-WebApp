@@ -170,7 +170,7 @@ export default function Sidebar({ onExpandChange }) {
             label="Nhân viên"
           />
           <SubItemLink
-            to="/owner/schedule"
+            to="/owner/staff-schedule"
             expanded={expanded}
             icon={<CalendarDays className="h-4 w-4" />}
             label="Lịch trình"

@@ -18,7 +18,7 @@ import OwnerTrackingOrder from "./pages/Owner/OwnerTrackingOrder";
 import OwnerPartyCategory from "./pages/Owner/OwnerPartyCategory";
 import OwnerIngredient from "./pages/Owner/OwnerIngredient";
 import OwnerStaffManagement from "./pages/Owner/OwnerStaffManagment";
-import OwnerSchedule from "./pages/Owner/OwnerSchedule";
+import OwnerStaffSchedule from "./pages/Owner/OwnerStaffSchedule";
 export default function App() {
   return (
     <Router>
@@ -38,7 +38,7 @@ export default function App() {
               <Route path="party-category" element={<OwnerPartyCategory />} />
               <Route path="ingredient" element={<OwnerIngredient />} />
               <Route path="staff" element={<OwnerStaffManagement />} />
-              <Route path="schedule" element={<OwnerSchedule />} />
+              <Route path="staff-schedule" element={<OwnerStaffSchedule />} />
             </Route>
           </Routes>
           <Toaster />
