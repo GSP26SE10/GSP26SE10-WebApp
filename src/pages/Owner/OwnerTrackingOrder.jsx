@@ -3,6 +3,7 @@ import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import ChatPanel from "@/components/ChatPanel";
 import API_URL from "@/config/api";
+import { toast } from "sonner";
 import {
   ClipboardList,
   CheckCircle2,
@@ -434,12 +435,12 @@ export default function OwnerTrackingOrder() {
     if (!selectedOrder || !selectedDetail) return;
 
     if (Number(selectedOrder.status) !== 2) {
-      setError("Chỉ gán nhóm cho đơn đã được duyệt.");
+      toast.error("Chỉ gán nhóm cho đơn đã được duyệt.");
       return;
     }
 
     if (!selectedStaffGroupId) {
-      setError("Vui lòng chọn nhóm phụ trách.");
+      toast.warning("Vui lòng chọn nhóm phụ trách.");
       return;
     }
 
@@ -470,10 +471,10 @@ export default function OwnerTrackingOrder() {
         throw new Error(data?.message || "Gán nhóm phụ trách thất bại");
       }
 
-      setMessage("Gán nhóm phụ trách thành công.");
+      toast.success("Gán nhóm phụ trách thành công.");
       await fetchOrders();
     } catch (err) {
-      setError(err.message || "Gán nhóm phụ trách thất bại");
+      toast.error(err.message || "Gán nhóm phụ trách thất bại");
     } finally {
       setAssigning(false);
     }
@@ -1154,17 +1155,6 @@ function OrderDetailPanel({
                 </div>
               </div>
             </div>
-
-            {(message || error) && (
-              <div className="rounded-2xl bg-white p-5">
-                {message ? (
-                  <div className="text-sm text-green-600">{message}</div>
-                ) : null}
-                {error ? (
-                  <div className="text-sm text-red-500">{error}</div>
-                ) : null}
-              </div>
-            )}
           </div>
 
           <div className="space-y-5">

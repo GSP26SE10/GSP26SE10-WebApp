@@ -3,6 +3,7 @@ import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import ChatPanel from "@/components/ChatPanel";
 import API_URL from "@/config/api";
+import { toast } from "sonner";
 import {
   ClipboardList,
   Filter,
@@ -111,7 +112,7 @@ export default function OwnerPendingOrder() {
         setSelectedOrderDetailId(null);
       }
     } catch (err) {
-      setError(err.message || "Đã có lỗi xảy ra");
+      toast.error(err.message || "Đã có lỗi xảy ra");
     } finally {
       setLoading(false);
     }
@@ -204,11 +205,11 @@ export default function OwnerPendingOrder() {
         throw new Error(data?.message || "Duyệt đơn thất bại");
       }
 
-      setMessage("Duyệt đơn thành công.");
+      toast.success("Duyệt đơn thành công.");
       setSelectedOrderId(null);
       await fetchOrders();
     } catch (err) {
-      setError(err.message || "Duyệt đơn thất bại");
+      toast.error(err.message || "Duyệt đơn thất bại");
     } finally {
       setActionLoading("");
     }
@@ -218,7 +219,7 @@ export default function OwnerPendingOrder() {
     if (!selectedOrder) return;
 
     if (!rejectReason.trim()) {
-      setError("Vui lòng nhập lý do từ chối");
+      toast.warning("Vui lòng nhập lý do từ chối");
       return;
     }
 
@@ -249,13 +250,13 @@ export default function OwnerPendingOrder() {
         throw new Error(data?.message || "Từ chối đơn thất bại");
       }
 
-      setMessage("Từ chối đơn thành công.");
+      toast.success("Từ chối đơn thành công.");
       setRejectReason("");
       setOpenRejectModal(false);
       setSelectedOrderId(null);
       await fetchOrders();
     } catch (err) {
-      setError(err.message || "Từ chối đơn thất bại");
+      toast.error(err.message || "Từ chối đơn thất bại");
     } finally {
       setActionLoading("");
     }
@@ -1007,17 +1008,6 @@ function OrderDetailPanel({
               </div>
             </div>
           </div>
-
-          {(message || error) && (
-            <div className="rounded-[24px] border border-[#ECEFF5] bg-white p-5">
-              {message ? (
-                <div className="text-sm text-green-600">{message}</div>
-              ) : null}
-              {error ? (
-                <div className="text-sm text-red-500">{error}</div>
-              ) : null}
-            </div>
-          )}
         </div>
 
         <div className="space-y-5">
