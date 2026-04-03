@@ -3,6 +3,7 @@ import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import ChatPanel from "@/components/ChatPanel";
 import API_URL from "@/config/api";
+import { toast } from "sonner";
 import { Plus } from "lucide-react";
 
 export default function OwnerService() {
@@ -31,7 +32,9 @@ export default function OwnerService() {
 
         setServices(Array.isArray(data?.items) ? data.items : []);
       } catch (err) {
-        setError(err.message || "Đã có lỗi xảy ra");
+        const errMessage = err.message || "Đã có lỗi xảy ra";
+        setError(errMessage);
+        toast.error(errMessage);
       } finally {
         setLoading(false);
       }

@@ -4,6 +4,7 @@ import { Search, Mail, Bell, ChevronDown, Plus } from "lucide-react";
 
 import API_URL from "@/config/api";
 import Topbar from "@/components/Topbar";
+import { toast } from "sonner";
 
 export default function OwnerDishCategory() {
   const [sbExpanded, setSbExpanded] = React.useState(false);
@@ -33,7 +34,9 @@ export default function OwnerDishCategory() {
 
         setCategories(Array.isArray(data?.items) ? data.items : []);
       } catch (err) {
-        setError(err.message || "Đã có lỗi xảy ra");
+        const message = err.message || "Đã có lỗi xảy ra";
+        setError(message);
+        toast.error(message);
       } finally {
         setLoading(false);
       }

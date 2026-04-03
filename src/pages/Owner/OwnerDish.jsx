@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import API_URL from "@/config/api";
 import Topbar from "@/components/Topbar";
+import { toast } from "sonner";
 
 export default function OwnerDish() {
   const [sbExpanded, setSbExpanded] = React.useState(false);
@@ -57,8 +58,6 @@ export default function OwnerDish() {
   const [submittingCategory, setSubmittingCategory] = React.useState(false);
   const [updatingDish, setUpdatingDish] = React.useState(false);
   const [deletingDish, setDeletingDish] = React.useState(false);
-  const [modalError, setModalError] = React.useState("");
-  const [modalSuccess, setModalSuccess] = React.useState("");
 
   const fetchData = React.useCallback(async () => {
     setLoading(true);
@@ -167,15 +166,11 @@ export default function OwnerDish() {
 
   const openAddDishModal = () => {
     resetDishForm();
-    setModalError("");
-    setModalSuccess("");
     setOpenDishModal(true);
   };
 
   const openAddCategoryModal = () => {
     resetCategoryForm();
-    setModalError("");
-    setModalSuccess("");
     setOpenCategoryModal(true);
   };
 
@@ -192,8 +187,6 @@ export default function OwnerDish() {
     });
     setDishImageFile(null);
     setDishImagePreview(getImageUrl(dish.img));
-    setModalError("");
-    setModalSuccess("");
     setOpenDetailModal(true);
   };
 
@@ -202,15 +195,11 @@ export default function OwnerDish() {
     setOpenCategoryModal(false);
     setOpenDetailModal(false);
     setSelectedDish(null);
-    setModalError("");
-    setModalSuccess("");
   };
 
   const handleDishSubmit = async (e) => {
     e.preventDefault();
     setSubmittingDish(true);
-    setModalError("");
-    setModalSuccess("");
 
     try {
       const payload = {
@@ -247,16 +236,15 @@ export default function OwnerDish() {
         throw new Error(data?.message || "Thêm món thất bại");
       }
 
-      setModalSuccess("Thêm món thành công.");
+      toast.success("Thêm món thành công.");
       resetDishForm();
       await fetchData();
 
       setTimeout(() => {
         setOpenDishModal(false);
-        setModalSuccess("");
       }, 700);
     } catch (err) {
-      setModalError(err.message || "Đã có lỗi xảy ra");
+      toast.error(err.message || "Đã có lỗi xảy ra");
     } finally {
       setSubmittingDish(false);
     }
@@ -278,8 +266,6 @@ export default function OwnerDish() {
   const handleCategorySubmit = async (e) => {
     e.preventDefault();
     setSubmittingCategory(true);
-    setModalError("");
-    setModalSuccess("");
 
     try {
       const payload = {
@@ -331,15 +317,14 @@ export default function OwnerDish() {
         }));
       }
 
-      setModalSuccess("Thêm danh mục thành công.");
+      toast.success("Thêm danh mục thành công.");
       resetCategoryForm();
 
       setTimeout(() => {
         setOpenCategoryModal(false);
-        setModalSuccess("");
       }, 700);
     } catch (err) {
-      setModalError(err.message || "Đã có lỗi xảy ra");
+      toast.error(err.message || "Đã có lỗi xảy ra");
     } finally {
       setSubmittingCategory(false);
     }
@@ -350,8 +335,6 @@ export default function OwnerDish() {
     if (!selectedDish?.dishId) return;
 
     setUpdatingDish(true);
-    setModalError("");
-    setModalSuccess("");
 
     try {
       const payload = {
@@ -388,16 +371,15 @@ export default function OwnerDish() {
         throw new Error(data?.message || "Cập nhật món thất bại");
       }
 
-      setModalSuccess("Cập nhật món thành công.");
+      toast.success("Cập nhật món thành công.");
       await fetchData();
 
       setTimeout(() => {
         setOpenDetailModal(false);
         setSelectedDish(null);
-        setModalSuccess("");
       }, 700);
     } catch (err) {
-      setModalError(err.message || "Đã có lỗi xảy ra");
+      toast.error(err.message || "Đã có lỗi xảy ra");
     } finally {
       setUpdatingDish(false);
     }
@@ -412,8 +394,6 @@ export default function OwnerDish() {
     if (!confirmed) return;
 
     setDeletingDish(true);
-    setModalError("");
-    setModalSuccess("");
 
     try {
       const res = await fetch(`${API_URL}/api/dish/${selectedDish.dishId}`, {
@@ -437,8 +417,9 @@ export default function OwnerDish() {
       await fetchData();
       setOpenDetailModal(false);
       setSelectedDish(null);
+      toast.success("Xóa món thành công.");
     } catch (err) {
-      setModalError(err.message || "Đã có lỗi xảy ra");
+      toast.error(err.message || "Đã có lỗi xảy ra");
     } finally {
       setDeletingDish(false);
     }
@@ -750,13 +731,6 @@ export default function OwnerDish() {
                 onChange={(v) => setDishForm((p) => ({ ...p, description: v }))}
               />
 
-              {modalError && (
-                <div className="text-sm text-red-500">{modalError}</div>
-              )}
-              {modalSuccess && (
-                <div className="text-sm text-green-600">{modalSuccess}</div>
-              )}
-
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
@@ -789,8 +763,6 @@ export default function OwnerDish() {
                 type="button"
                 onClick={() => {
                   setOpenCategoryModal(false);
-                  setModalError("");
-                  setModalSuccess("");
                 }}
                 className="p-2 rounded-full hover:bg-gray-100"
               >
@@ -819,20 +791,11 @@ export default function OwnerDish() {
                 }
               />
 
-              {modalError && (
-                <div className="text-sm text-red-500">{modalError}</div>
-              )}
-              {modalSuccess && (
-                <div className="text-sm text-green-600">{modalSuccess}</div>
-              )}
-
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => {
                     setOpenCategoryModal(false);
-                    setModalError("");
-                    setModalSuccess("");
                   }}
                   className="h-10 px-4 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition"
                 >
@@ -941,13 +904,6 @@ export default function OwnerDish() {
                 value={dishForm.description}
                 onChange={(v) => setDishForm((p) => ({ ...p, description: v }))}
               />
-
-              {modalError && (
-                <div className="text-sm text-red-500">{modalError}</div>
-              )}
-              {modalSuccess && (
-                <div className="text-sm text-green-600">{modalSuccess}</div>
-              )}
 
               <div className="flex justify-between gap-3 pt-2">
                 <button

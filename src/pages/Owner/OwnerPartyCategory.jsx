@@ -2,6 +2,7 @@ import React from "react";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import API_URL from "@/config/api";
+import { toast } from "sonner";
 import {
   Filter,
   Plus,
@@ -68,7 +69,9 @@ export default function OwnerPartyCategory() {
       const items = Array.isArray(data?.items) ? data.items : [];
       setCategories(items);
     } catch (err) {
-      setError(err.message || "Đã có lỗi xảy ra");
+      const errorMessage = err.message || "Đã có lỗi xảy ra";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -187,6 +190,7 @@ export default function OwnerPartyCategory() {
     const validationError = validateForm();
     if (validationError) {
       setError(validationError);
+      toast.error(validationError);
       return;
     }
 
@@ -241,15 +245,18 @@ export default function OwnerPartyCategory() {
         );
       }
 
-      setMessage(
+      const successMessage =
         modalMode === "create"
           ? "Tạo loại tiệc thành công."
-          : "Cập nhật loại tiệc thành công.",
-      );
+          : "Cập nhật loại tiệc thành công.";
+      setMessage(successMessage);
+      toast.success(successMessage);
       closeModal();
       await fetchCategories();
     } catch (err) {
-      setError(err.message || "Thao tác thất bại");
+      const errorMessage = err.message || "Thao tác thất bại";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -280,10 +287,14 @@ export default function OwnerPartyCategory() {
         throw new Error(data?.message || "Xóa loại tiệc thất bại");
       }
 
-      setMessage("Xóa loại tiệc thành công.");
+      const successMessage = "Xóa loại tiệc thành công.";
+      setMessage(successMessage);
+      toast.success(successMessage);
       await fetchCategories();
     } catch (err) {
-      setError(err.message || "Xóa loại tiệc thất bại");
+      const errorMessage = err.message || "Xóa loại tiệc thất bại";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setDeletingId(null);
     }

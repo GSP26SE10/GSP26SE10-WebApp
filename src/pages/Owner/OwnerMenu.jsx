@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import API_URL from "@/config/api";
 import Topbar from "@/components/Topbar";
+import { toast } from "sonner";
 
 export default function OwnerMenu() {
   const [sbExpanded, setSbExpanded] = React.useState(false);
@@ -51,8 +52,6 @@ export default function OwnerMenu() {
   const [submitting, setSubmitting] = React.useState(false);
   const [updating, setUpdating] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
-  const [modalError, setModalError] = React.useState("");
-  const [modalSuccess, setModalSuccess] = React.useState("");
   const [menuImageFile, setMenuImageFile] = React.useState(null);
   const [menuImagePreview, setMenuImagePreview] = React.useState("");
 
@@ -187,8 +186,6 @@ export default function OwnerMenu() {
 
   const openCreateModal = () => {
     resetForm();
-    setModalError("");
-    setModalSuccess("");
     setOpenAddModal(true);
   };
 
@@ -204,8 +201,6 @@ export default function OwnerMenu() {
     });
     setMenuImageFile(null);
     setMenuImagePreview(getMenuImageUrl(menu.imgUrl));
-    setModalError("");
-    setModalSuccess("");
     setOpenDetailModal(true);
   };
 
@@ -213,8 +208,6 @@ export default function OwnerMenu() {
     setOpenAddModal(false);
     setOpenDetailModal(false);
     setSelectedMenu(null);
-    setModalError("");
-    setModalSuccess("");
   };
 
   const syncMenuDishes = async (menuId, selectedDishIds) => {
@@ -253,8 +246,6 @@ export default function OwnerMenu() {
   const handleCreateMenu = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    setModalError("");
-    setModalSuccess("");
 
     try {
       const payload = {
@@ -290,16 +281,15 @@ export default function OwnerMenu() {
         await syncMenuDishes(createdMenuId, menuForm.selectedDishIds);
       }
 
-      setModalSuccess("Thêm menu thành công.");
+      toast.success("Thêm menu thành công.");
       resetForm();
       await fetchData();
 
       setTimeout(() => {
         setOpenAddModal(false);
-        setModalSuccess("");
       }, 700);
     } catch (err) {
-      setModalError(err.message || "Đã có lỗi xảy ra");
+      toast.error(err.message || "Đã có lỗi xảy ra");
     } finally {
       setSubmitting(false);
     }
@@ -310,8 +300,6 @@ export default function OwnerMenu() {
     if (!selectedMenu?.menuId) return;
 
     setUpdating(true);
-    setModalError("");
-    setModalSuccess("");
 
     try {
       const payload = {
@@ -343,15 +331,14 @@ export default function OwnerMenu() {
       await syncMenuDishes(selectedMenu.menuId, menuForm.selectedDishIds);
       await fetchData();
 
-      setModalSuccess("Cập nhật menu thành công.");
+      toast.success("Cập nhật menu thành công.");
 
       setTimeout(() => {
         setOpenDetailModal(false);
         setSelectedMenu(null);
-        setModalSuccess("");
       }, 700);
     } catch (err) {
-      setModalError(err.message || "Đã có lỗi xảy ra");
+      toast.error(err.message || "Đã có lỗi xảy ra");
     } finally {
       setUpdating(false);
     }
@@ -366,7 +353,6 @@ export default function OwnerMenu() {
     if (!confirmed) return;
 
     setDeleting(true);
-    setModalError("");
 
     try {
       const relations = getMenuDishRelations(selectedMenu.menuId);
@@ -397,8 +383,9 @@ export default function OwnerMenu() {
       await fetchData();
       setOpenDetailModal(false);
       setSelectedMenu(null);
+      toast.success("Xóa menu thành công.");
     } catch (err) {
-      setModalError(err.message || "Đã có lỗi xảy ra");
+      toast.error(err.message || "Đã có lỗi xảy ra");
     } finally {
       setDeleting(false);
     }
@@ -746,13 +733,6 @@ export default function OwnerMenu() {
                 </div>
               </div>
 
-              {modalError && (
-                <div className="text-sm text-red-500">{modalError}</div>
-              )}
-              {modalSuccess && (
-                <div className="text-sm text-green-600">{modalSuccess}</div>
-              )}
-
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
@@ -921,13 +901,6 @@ export default function OwnerMenu() {
                   })}
                 </div>
               </div>
-
-              {modalError && (
-                <div className="text-sm text-red-500">{modalError}</div>
-              )}
-              {modalSuccess && (
-                <div className="text-sm text-green-600">{modalSuccess}</div>
-              )}
 
               <div className="flex justify-between gap-3 pt-2">
                 <button
