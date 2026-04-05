@@ -63,7 +63,7 @@ export default function OwnerTaskTemplate() {
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-          throw new Error(data?.message || "Không thể tải task mẫu");
+          throw new Error(data?.message || "Không thể tải task ");
         }
 
         const items = Array.isArray(data?.items) ? data.items : [];
@@ -170,7 +170,7 @@ export default function OwnerTaskTemplate() {
       };
 
       if (!payload.taskName) {
-        toast.warning("Vui lòng nhập tên task mẫu.");
+        toast.warning("Vui lòng nhập tên task .");
         setSubmittingCreate(false);
         return;
       }
@@ -188,10 +188,10 @@ export default function OwnerTaskTemplate() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(data?.message || "Thêm task mẫu thất bại");
+        throw new Error(data?.message || "Thêm task thất bại");
       }
 
-      toast.success("Thêm task mẫu thành công");
+      toast.success("Thêm task thành công");
       closeCreateModal();
       await fetchAllTaskTemplates();
     } catch (err) {
@@ -214,7 +214,7 @@ export default function OwnerTaskTemplate() {
       };
 
       if (!payload.taskName) {
-        toast.warning("Vui lòng nhập tên task mẫu.");
+        toast.warning("Vui lòng nhập tên task .");
         setSubmittingEdit(false);
         return;
       }
@@ -235,10 +235,10 @@ export default function OwnerTaskTemplate() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(data?.message || "Cập nhật task mẫu thất bại");
+        throw new Error(data?.message || "Cập nhật task thất bại");
       }
 
-      toast.success("Cập nhật task mẫu thành công");
+      toast.success("Cập nhật task thành công");
       closeEditModal();
       await fetchAllTaskTemplates();
     } catch (err) {
@@ -267,10 +267,10 @@ export default function OwnerTaskTemplate() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(data?.message || "Xóa task mẫu thất bại");
+        throw new Error(data?.message || "Xóa task thất bại");
       }
 
-      toast.success("Xóa task mẫu thành công");
+      toast.success("Xóa task thành công");
       closeDeleteModal();
       await fetchAllTaskTemplates();
     } catch (err) {
@@ -294,19 +294,19 @@ export default function OwnerTaskTemplate() {
             <>
               <span className="text-gray-400">QUẢN LÝ</span>
               <span className="mx-2 text-gray-400">/</span>
-              <span className="text-gray-900">TASK MẪU</span>
+              <span className="text-gray-900">TASK </span>
             </>
           }
           showSearch
           searchValue={search}
           onSearchChange={setSearch}
-          searchPlaceholder="Tìm task mẫu"
+          searchPlaceholder="Tìm task "
         />
 
         <main className="px-7 py-6 pb-10">
           <div className="mb-8 flex items-center justify-between">
             <h1 className="text-[20px] font-bold text-[#E54B2D]">
-              Tất cả task mẫu
+              Tất cả task
             </h1>
 
             <button
@@ -315,7 +315,7 @@ export default function OwnerTaskTemplate() {
               className="flex h-10 items-center gap-2 rounded-lg bg-[#E8712E] px-4 text-sm font-semibold text-white transition hover:opacity-90"
             >
               <Plus className="h-4 w-4" />
-              Thêm task mẫu
+              Thêm task
             </button>
           </div>
 
@@ -324,9 +324,7 @@ export default function OwnerTaskTemplate() {
           ) : error ? (
             <div className="text-sm text-red-500">{error}</div>
           ) : filteredTasks.length === 0 ? (
-            <div className="text-sm text-gray-500">
-              Không có task mẫu phù hợp.
-            </div>
+            <div className="text-sm text-gray-500">Không có task phù hợp.</div>
           ) : (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
               {filteredTasks.map((task) => (
@@ -346,9 +344,7 @@ export default function OwnerTaskTemplate() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
             <div className="flex items-center justify-between border-b px-6 py-4">
-              <h2 className="text-lg font-bold text-gray-900">
-                Thêm task mẫu mới
-              </h2>
+              <h2 className="text-lg font-bold text-gray-900">Thêm task mới</h2>
               <button
                 type="button"
                 onClick={closeCreateModal}
@@ -360,7 +356,7 @@ export default function OwnerTaskTemplate() {
 
             <form onSubmit={handleCreateTask} className="space-y-4 p-6">
               <Field
-                label="Tên task mẫu"
+                label="Tên task "
                 value={createForm.taskName}
                 onChange={(v) =>
                   setCreateForm((prev) => ({
@@ -395,7 +391,7 @@ export default function OwnerTaskTemplate() {
                   disabled={submittingCreate}
                   className="h-10 rounded-lg bg-[#E8712E] px-4 font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
                 >
-                  {submittingCreate ? "Đang thêm..." : "Lưu task mẫu"}
+                  {submittingCreate ? "Đang thêm..." : "Lưu task "}
                 </button>
               </div>
             </form>
@@ -407,9 +403,7 @@ export default function OwnerTaskTemplate() {
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
             <div className="flex items-center justify-between border-b px-6 py-4">
-              <h2 className="text-lg font-bold text-gray-900">
-                Cập nhật task mẫu
-              </h2>
+              <h2 className="text-lg font-bold text-gray-900">Cập nhật task</h2>
               <button
                 type="button"
                 onClick={closeEditModal}
@@ -421,7 +415,7 @@ export default function OwnerTaskTemplate() {
 
             <form onSubmit={handleEditTask} className="space-y-4 p-6">
               <Field
-                label="Tên task mẫu"
+                label="Tên task "
                 value={editForm.taskName}
                 onChange={(v) =>
                   setEditForm((prev) => ({
@@ -469,13 +463,13 @@ export default function OwnerTaskTemplate() {
           <div className="w-full max-w-md rounded-2xl bg-white shadow-xl">
             <div className="border-b px-6 py-4">
               <h2 className="text-lg font-bold text-gray-900">
-                Xác nhận xóa task mẫu
+                Xác nhận xóa task
               </h2>
             </div>
 
             <div className="px-6 py-5">
               <p className="text-sm leading-6 text-gray-600">
-                Bạn có chắc muốn xóa task mẫu{" "}
+                Bạn có chắc muốn xóa task{" "}
                 <span className="font-semibold text-gray-900">
                   "{selectedTask.taskName}"
                 </span>{" "}

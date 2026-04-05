@@ -11,6 +11,54 @@ import {
 import API_URL from "@/config/api";
 import ChatPanel from "@/components/ChatPanel";
 
+const USER_ENDPOINT = `${API_URL}/api/user`;
+
+function parseJwt(token) {
+  try {
+    const base64Url = token.split(".")[1];
+    if (!base64Url) return null;
+
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
+        .join(""),
+    );
+
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
+function getCurrentAuthUser() {
+  const token =
+    localStorage.getItem("accessToken") ||
+    sessionStorage.getItem("accessToken");
+
+  if (!token) return null;
+
+  const payload = parseJwt(token);
+  if (!payload) return null;
+
+  return {
+    userId:
+      payload.userId ?? payload.id ?? payload.nameid ?? payload.sub ?? null,
+    userName:
+      payload.unique_name ??
+      payload.userName ??
+      payload.username ??
+      payload.name ??
+      "",
+    email: payload.email ?? "",
+    role:
+      payload.role ??
+      payload["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] ??
+      "",
+  };
+}
+
 export default function Topbar({
   title,
   breadcrumb,
@@ -32,6 +80,9 @@ export default function Topbar({
   const [loadingNotifications, setLoadingNotifications] = React.useState(true);
   const [notificationError, setNotificationError] = React.useState("");
 
+  const [profile, setProfile] = React.useState(null);
+  const [loadingProfile, setLoadingProfile] = React.useState(true);
+
   const notificationRef = React.useRef(null);
   const userRef = React.useRef(null);
 
@@ -52,6 +103,12 @@ export default function Topbar({
   ).length;
 
   const fetchNotifications = React.useCallback(async () => {
+    if (!token) {
+      setNotifications([]);
+      setLoadingNotifications(false);
+      return;
+    }
+
     setLoadingNotifications(true);
     setNotificationError("");
 
@@ -76,11 +133,85 @@ export default function Topbar({
     } finally {
       setLoadingNotifications(false);
     }
-  }, [authHeaders]);
+  }, [authHeaders, token]);
+
+  const fetchProfile = React.useCallback(async () => {
+    setLoadingProfile(true);
+
+    try {
+      let page = 1;
+      let allItems = [];
+      let hasMore = true;
+
+      while (hasMore) {
+        const res = await fetch(`${USER_ENDPOINT}?page=${page}&pageSize=100`, {
+          headers: { accept: "*/*" },
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          throw new Error(
+            data?.message || "Không thể tải thông tin người dùng",
+          );
+        }
+
+        const items = Array.isArray(data?.items) ? data.items : [];
+        allItems = [...allItems, ...items];
+
+        if (page >= Number(data?.totalPages || 1) || items.length === 0) {
+          hasMore = false;
+        } else {
+          page += 1;
+        }
+      }
+
+      const authUser = getCurrentAuthUser();
+      let currentUser = null;
+
+      if (authUser?.userId) {
+        currentUser = allItems.find(
+          (item) => String(item.userId) === String(authUser.userId),
+        );
+      }
+
+      if (!currentUser && authUser?.email) {
+        currentUser = allItems.find(
+          (item) =>
+            String(item.email || "").toLowerCase() ===
+            String(authUser.email).toLowerCase(),
+        );
+      }
+
+      if (!currentUser && authUser?.userName) {
+        currentUser = allItems.find(
+          (item) =>
+            String(item.userName || "").toLowerCase() ===
+            String(authUser.userName).toLowerCase(),
+        );
+      }
+
+      if (!currentUser) {
+        setProfile(null);
+        return;
+      }
+
+      setProfile(currentUser);
+    } catch (err) {
+      console.error("Fetch profile error:", err);
+      setProfile(null);
+    } finally {
+      setLoadingProfile(false);
+    }
+  }, []);
 
   React.useEffect(() => {
     fetchNotifications();
   }, [fetchNotifications]);
+
+  React.useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
 
   const handleMailClick = () => {
     if (onMailClick) {
@@ -174,6 +305,13 @@ export default function Topbar({
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [notificationOpen, userDropdownOpen]);
+
+  const displayName =
+    profile?.fullName || profile?.userName || userName || "Người dùng";
+
+  const displayEmail = profile?.email || userEmail || "";
+
+  const displayAvatar = profile?.avatar || avatarSrc || "";
 
   return (
     <>
@@ -314,9 +452,9 @@ export default function Topbar({
                 onClick={() => setUserDropdownOpen((prev) => !prev)}
                 className="flex items-center gap-2 rounded-full hover:bg-gray-50 pl-1 pr-2 py-1 transition"
               >
-                {avatarSrc ? (
+                {displayAvatar ? (
                   <img
-                    src={avatarSrc}
+                    src={displayAvatar}
                     alt="avatar"
                     className="h-9 w-9 rounded-full object-cover"
                   />
@@ -327,11 +465,11 @@ export default function Topbar({
                 )}
 
                 <div className="hidden md:block text-left">
-                  <div className="max-w-[140px] truncate text-sm font-medium text-gray-800">
-                    {userName}
+                  <div className="max-w-[180px] truncate text-sm font-medium text-gray-800">
+                    {loadingProfile ? "Đang tải..." : displayName}
                   </div>
-                  <div className="max-w-[140px] truncate text-xs text-gray-400">
-                    {userEmail}
+                  <div className="max-w-[180px] truncate text-xs text-gray-400">
+                    {displayEmail || "Chưa có email"}
                   </div>
                 </div>
 
@@ -351,10 +489,10 @@ export default function Topbar({
               >
                 <div className="border-b border-gray-100 px-4 py-3">
                   <div className="truncate text-sm font-semibold text-gray-900">
-                    {userName}
+                    {loadingProfile ? "Đang tải..." : displayName}
                   </div>
                   <div className="truncate text-xs text-gray-500">
-                    {userEmail}
+                    {displayEmail || "Chưa có email"}
                   </div>
                 </div>
 
