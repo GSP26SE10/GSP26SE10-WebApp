@@ -12,11 +12,29 @@ import {
 import API_URL from "@/config/api";
 import Topbar from "@/components/Topbar";
 import { toast } from "sonner";
+import ChatPanel from "@/components/ChatPanel";
+
+const STATUS_OPTIONS = [
+  { value: "all", label: "Tất cả" },
+  { value: "1", label: "Hoạt động" },
+  { value: "0", label: "Ngưng hoạt động" },
+];
+
+const EMPTY_MENU_FORM = {
+  menuName: "",
+  menuCategoryId: "",
+  partyCategoryIds: [],
+  basePrice: "",
+  status: "1",
+  selectedDishIds: [],
+};
 
 export default function OwnerMenu() {
   const [sbExpanded, setSbExpanded] = React.useState(false);
+  const [openChat, setOpenChat] = React.useState(false);
 
   const [menus, setMenus] = React.useState([]);
+  const [allMenus, setAllMenus] = React.useState([]);
   const [dishes, setDishes] = React.useState([]);
   const [menuDishLinks, setMenuDishLinks] = React.useState([]);
 
@@ -39,150 +57,262 @@ export default function OwnerMenu() {
   const [openDetailModal, setOpenDetailModal] = React.useState(false);
 
   const [selectedMenu, setSelectedMenu] = React.useState(null);
-
-  const [menuForm, setMenuForm] = React.useState({
-    menuName: "",
-    menuCategoryId: "",
-    partyCategoryName: "",
-    basePrice: "",
-    imgUrl: "",
-    selectedDishIds: [],
-  });
+  const [menuForm, setMenuForm] = React.useState(EMPTY_MENU_FORM);
 
   const [submitting, setSubmitting] = React.useState(false);
   const [updating, setUpdating] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
-  const [menuImageFile, setMenuImageFile] = React.useState(null);
-  const [menuImagePreview, setMenuImagePreview] = React.useState("");
 
-  const menuCategoryOptions = [
-    { value: 1, label: "Buffet bò" },
-    { value: 2, label: "Buffet hải sản" },
-    { value: 3, label: "Buffet chay" },
-  ];
+  const [menuImageFiles, setMenuImageFiles] = React.useState([]);
+  const [newMenuImagePreviews, setNewMenuImagePreviews] = React.useState([]);
+  const [existingMenuImages, setExistingMenuImages] = React.useState([]);
 
-  const partyCategoryOptions = [
-    { value: "Birthday Party", label: "Birthday Party" },
-    { value: "Wedding Party", label: "Wedding Party" },
-    { value: "Conference", label: "Conference" },
-  ];
-  const resetMenuImage = () => {
-    setMenuImageFile(null);
-    setMenuImagePreview("");
-  };
+  const [menuCategories, setMenuCategories] = React.useState([]);
+  const [partyCategories, setPartyCategories] = React.useState([]);
+  const [loadingCategories, setLoadingCategories] = React.useState(true);
+  const [categoryError, setCategoryError] = React.useState("");
+
+  const revokePreviewUrls = React.useCallback((urls) => {
+    urls.forEach((url) => {
+      if (typeof url === "string" && url.startsWith("blob:")) {
+        URL.revokeObjectURL(url);
+      }
+    });
+  }, []);
+
+  React.useEffect(() => {
+    return () => {
+      revokePreviewUrls(newMenuImagePreviews);
+    };
+  }, [newMenuImagePreviews, revokePreviewUrls]);
+
+  const resetMenuImages = React.useCallback(() => {
+    revokePreviewUrls(newMenuImagePreviews);
+    setMenuImageFiles([]);
+    setNewMenuImagePreviews([]);
+    setExistingMenuImages([]);
+  }, [newMenuImagePreviews, revokePreviewUrls]);
+
+  const fetchCategories = React.useCallback(async () => {
+    setLoadingCategories(true);
+    setCategoryError("");
+
+    try {
+      const [menuCategoryRes, partyCategoryRes] = await Promise.all([
+        fetch(`${API_URL}/api/menu-category`, {
+          headers: { accept: "*/*" },
+        }),
+        fetch(`${API_URL}/api/party-category`, {
+          headers: { accept: "*/*" },
+        }),
+      ]);
+
+      const [menuCategoryData, partyCategoryData] = await Promise.all([
+        menuCategoryRes.json().catch(() => ({})),
+        partyCategoryRes.json().catch(() => ({})),
+      ]);
+
+      if (!menuCategoryRes.ok) {
+        throw new Error(
+          menuCategoryData?.message || "Không thể tải danh sách loại menu",
+        );
+      }
+      if (!partyCategoryRes.ok) {
+        throw new Error(
+          partyCategoryData?.message || "Không thể tải danh sách loại tiệc",
+        );
+      }
+
+      setMenuCategories(extractItems(menuCategoryData));
+      setPartyCategories(extractItems(partyCategoryData));
+    } catch (err) {
+      const message = err.message || "Đã có lỗi khi tải danh sách danh mục";
+      setCategoryError(message);
+      setMenuCategories([]);
+      setPartyCategories([]);
+    } finally {
+      setLoadingCategories(false);
+    }
+  }, []);
 
   const handleMenuImageChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-    setMenuImageFile(file);
+    const nextFiles = files.filter(
+      (file) =>
+        !menuImageFiles.some(
+          (existing) =>
+            existing.name === file.name &&
+            existing.size === file.size &&
+            existing.lastModified === file.lastModified,
+        ),
+    );
 
-    const previewUrl = URL.createObjectURL(file);
-    setMenuImagePreview(previewUrl);
+    if (nextFiles.length === 0) {
+      e.target.value = "";
+      return;
+    }
+
+    const nextPreviews = nextFiles.map((file) => URL.createObjectURL(file));
+
+    setMenuImageFiles((prev) => [...prev, ...nextFiles]);
+    setNewMenuImagePreviews((prev) => [...prev, ...nextPreviews]);
+    e.target.value = "";
   };
+
+  const removeNewMenuImage = (index) => {
+    setMenuImageFiles((prev) => prev.filter((_, idx) => idx !== index));
+    setNewMenuImagePreviews((prev) => {
+      const removed = prev[index];
+      revokePreviewUrls([removed]);
+      return prev.filter((_, idx) => idx !== index);
+    });
+  };
+
+  const removeExistingMenuImage = (index) => {
+    setExistingMenuImages((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const fetchAllPages = async (basePath, pageSizeValue = 100) => {
+    let currentPage = 1;
+    let total = 1;
+    const merged = [];
+
+    do {
+      const res = await fetch(
+        `${API_URL}${basePath}?page=${currentPage}&pageSize=${pageSizeValue}`,
+        { headers: { accept: "*/*" } },
+      );
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(
+          data?.message || `Không thể tải dữ liệu từ ${basePath}`,
+        );
+      }
+
+      const items = Array.isArray(data?.items) ? data.items : [];
+      merged.push(...items);
+
+      total = Number(data?.totalPages || 1);
+      currentPage += 1;
+    } while (currentPage <= total);
+
+    return merged;
+  };
+
   const fetchData = React.useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      const [menuRes, dishRes, menuDishRes] = await Promise.all([
-        fetch(`${API_URL}/api/menu?page=${page}&pageSize=${pageSize}`, {
-          headers: { accept: "*/*" },
-        }),
-        fetch(`${API_URL}/api/dish?page=1&pageSize=200`, {
-          headers: { accept: "*/*" },
-        }),
-        fetch(`${API_URL}/api/menu-dish?page=1&pageSize=1000`, {
-          headers: { accept: "*/*" },
-        }),
+      const [menuItems, dishItems, menuDishItems] = await Promise.all([
+        fetchAllPages("/api/menu", 50),
+        fetchAllPages("/api/dish", 200),
+        fetchAllPages("/api/menu-dish", 1000),
       ]);
 
-      const menuData = await menuRes.json();
-      const dishData = await dishRes.json();
-      const menuDishData = await menuDishRes.json();
-
-      if (!menuRes.ok) {
-        throw new Error(menuData?.message || "Không thể tải danh sách menu");
-      }
-      if (!dishRes.ok) {
-        throw new Error(dishData?.message || "Không thể tải danh sách món");
-      }
-      if (!menuDishRes.ok) {
-        throw new Error(
-          menuDishData?.message || "Không thể tải danh sách menu-món",
-        );
-      }
-
-      setMenus(Array.isArray(menuData?.items) ? menuData.items : []);
-      setDishes(Array.isArray(dishData?.items) ? dishData.items : []);
-      setMenuDishLinks(
-        Array.isArray(menuDishData?.items) ? menuDishData.items : [],
-      );
-      setTotalPages(Number(menuData?.totalPages || 1));
+      setAllMenus(menuItems);
+      setDishes(dishItems);
+      setMenuDishLinks(menuDishItems);
     } catch (err) {
       setError(err.message || "Đã có lỗi xảy ra");
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, []);
 
   React.useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    fetchCategories();
+  }, [fetchData, fetchCategories]);
 
-  const filteredMenus = menus.filter((menu) => {
+  const getMenuDishIds = React.useCallback(
+    (menuId) => {
+      return menuDishLinks
+        .filter((x) => Number(x.menuId) === Number(menuId))
+        .map((x) => Number(x.dishId));
+    },
+    [menuDishLinks],
+  );
+
+  const getMenuPreviewDishes = React.useCallback(
+    (menuId) => {
+      const ids = getMenuDishIds(menuId);
+      return dishes.filter((d) => ids.includes(Number(d.dishId)));
+    },
+    [dishes, getMenuDishIds],
+  );
+
+  const getMenuDishRelations = React.useCallback(
+    (menuId) => {
+      return menuDishLinks.filter((x) => Number(x.menuId) === Number(menuId));
+    },
+    [menuDishLinks],
+  );
+
+  const filteredMenus = React.useMemo(() => {
     const keyword = search.trim().toLowerCase();
-    const menuName = String(menu.menuName || "").toLowerCase();
-    const categoryName = String(menu.menuCategoryName || "").toLowerCase();
-    const partyName = String(menu.partyCategoryName || "").toLowerCase();
-    const status = String(menu.status || "").toUpperCase();
-    const basePrice = Number(menu.basePrice || 0);
 
-    const matchSearch =
-      !keyword ||
-      menuName.includes(keyword) ||
-      categoryName.includes(keyword) ||
-      partyName.includes(keyword);
+    return allMenus.filter((menu) => {
+      const menuName = String(menu.menuName || "").toLowerCase();
+      const categoryName = String(menu.menuCategoryName || "").toLowerCase();
+      const partyNames = getPartyCategoryLabel(menu).toLowerCase();
+      const status = String(normalizeStatusValue(menu.status));
+      const basePrice = Number(menu.basePrice || 0);
+      const dishNames = getMenuPreviewDishes(menu.menuId)
+        .map((dish) => String(dish.dishName || "").toLowerCase())
+        .join(" ");
 
-    const matchStatus =
-      filters.status === "all" ||
-      status === String(filters.status).toUpperCase();
+      const matchSearch =
+        !keyword ||
+        menuName.includes(keyword) ||
+        categoryName.includes(keyword) ||
+        partyNames.includes(keyword) ||
+        dishNames.includes(keyword);
 
-    const min = filters.priceMin === "" ? null : Number(filters.priceMin);
-    const max = filters.priceMax === "" ? null : Number(filters.priceMax);
+      const matchStatus =
+        filters.status === "all" || status === String(filters.status);
 
-    const matchMin = min === null || basePrice >= min;
-    const matchMax = max === null || basePrice <= max;
+      const min = filters.priceMin === "" ? null : Number(filters.priceMin);
+      const max = filters.priceMax === "" ? null : Number(filters.priceMax);
 
-    return matchSearch && matchStatus && matchMin && matchMax;
-  });
+      const matchMin = min === null || basePrice >= min;
+      const matchMax = max === null || basePrice <= max;
 
-  const resetForm = () => {
-    setMenuForm({
-      menuName: "",
-      menuCategoryId: "",
-      partyCategoryName: "",
-      basePrice: "",
-      imgUrl: "",
-      selectedDishIds: [],
+      return matchSearch && matchStatus && matchMin && matchMax;
     });
-    resetMenuImage();
-  };
+  }, [allMenus, search, filters, getMenuPreviewDishes]);
 
-  const getMenuDishIds = (menuId) => {
-    return menuDishLinks
-      .filter((x) => Number(x.menuId) === Number(menuId))
-      .map((x) => Number(x.dishId));
-  };
+  React.useEffect(() => {
+    setPage(1);
+  }, [search, filters.status, filters.priceMin, filters.priceMax]);
 
-  const getMenuPreviewDishes = (menuId) => {
-    const ids = getMenuDishIds(menuId);
-    return dishes.filter((d) => ids.includes(Number(d.dishId))).slice(0, 5);
-  };
+  React.useEffect(() => {
+    const nextTotalPages = Math.max(
+      1,
+      Math.ceil(filteredMenus.length / pageSize),
+    );
+    setTotalPages(nextTotalPages);
 
-  const getMenuDishRelations = (menuId) => {
-    return menuDishLinks.filter((x) => Number(x.menuId) === Number(menuId));
-  };
+    const safePage = Math.min(page, nextTotalPages);
+    const start = (safePage - 1) * pageSize;
+    const end = start + pageSize;
+
+    if (safePage !== page) {
+      setPage(safePage);
+      return;
+    }
+
+    setMenus(filteredMenus.slice(start, end));
+  }, [filteredMenus, page]);
+
+  const resetForm = React.useCallback(() => {
+    setMenuForm(EMPTY_MENU_FORM);
+    resetMenuImages();
+  }, [resetMenuImages]);
 
   const openCreateModal = () => {
     resetForm();
@@ -194,13 +324,15 @@ export default function OwnerMenu() {
     setMenuForm({
       menuName: menu.menuName || "",
       menuCategoryId: String(menu.menuCategoryId || ""),
-      partyCategoryName: menu.partyCategoryName || "",
+      partyCategoryIds: normalizeIdArray(menu.partyCategoryIds),
       basePrice: String(menu.basePrice || ""),
-      imgUrl: menu.imgUrl || "",
+      status: String(normalizeStatusValue(menu.status)),
       selectedDishIds: getMenuDishIds(menu.menuId),
     });
-    setMenuImageFile(null);
-    setMenuImagePreview(getMenuImageUrl(menu.imgUrl));
+    revokePreviewUrls(newMenuImagePreviews);
+    setMenuImageFiles([]);
+    setNewMenuImagePreviews([]);
+    setExistingMenuImages(normalizeImageUrls(menu.imgUrl));
     setOpenDetailModal(true);
   };
 
@@ -208,6 +340,7 @@ export default function OwnerMenu() {
     setOpenAddModal(false);
     setOpenDetailModal(false);
     setSelectedMenu(null);
+    resetForm();
   };
 
   const syncMenuDishes = async (menuId, selectedDishIds) => {
@@ -243,29 +376,46 @@ export default function OwnerMenu() {
     }
   };
 
+  const buildMenuFormData = ({ includeStatus = false } = {}) => {
+    const formData = new FormData();
+    const menuName = menuForm.menuName.trim();
+    const menuCategoryId = Number(menuForm.menuCategoryId);
+    const basePrice = Number(menuForm.basePrice);
+
+    if (!menuName || !menuCategoryId || Number.isNaN(basePrice)) {
+      throw new Error("Vui lòng nhập đầy đủ thông tin bắt buộc.");
+    }
+
+    formData.append("MenuName", menuName);
+    formData.append("MenuCategoryId", String(menuCategoryId));
+    formData.append("BasePrice", String(basePrice));
+
+    normalizeIdArray(menuForm.partyCategoryIds).forEach((id) => {
+      formData.append("PartyCategoryIds", String(id));
+    });
+
+    if (includeStatus) {
+      formData.append("Status", String(normalizeStatusValue(menuForm.status)));
+    }
+
+    menuImageFiles.forEach((file) => {
+      formData.append("ImgFiles", file);
+    });
+
+    return formData;
+  };
+
   const handleCreateMenu = async (e) => {
     e.preventDefault();
     setSubmitting(true);
 
     try {
-      const payload = {
-        menuName: menuForm.menuName.trim(),
-        menuCategoryId: Number(menuForm.menuCategoryId),
-        basePrice: Number(menuForm.basePrice),
-        imgUrl: menuForm.imgUrl.trim(),
-      };
-
-      if (!payload.menuName || !payload.menuCategoryId || !payload.basePrice) {
-        throw new Error("Vui lòng nhập đầy đủ thông tin bắt buộc.");
-      }
+      const body = buildMenuFormData();
 
       const res = await fetch(`${API_URL}/api/menu`, {
         method: "POST",
-        headers: {
-          accept: "*/*",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+        headers: { accept: "*/*" },
+        body,
       });
 
       const data = await res.json().catch(() => ({}));
@@ -282,12 +432,8 @@ export default function OwnerMenu() {
       }
 
       toast.success("Thêm menu thành công.");
-      resetForm();
       await fetchData();
-
-      setTimeout(() => {
-        setOpenAddModal(false);
-      }, 700);
+      closeAllModals();
     } catch (err) {
       toast.error(err.message || "Đã có lỗi xảy ra");
     } finally {
@@ -302,24 +448,12 @@ export default function OwnerMenu() {
     setUpdating(true);
 
     try {
-      const payload = {
-        menuName: menuForm.menuName.trim(),
-        menuCategoryId: Number(menuForm.menuCategoryId),
-        basePrice: Number(menuForm.basePrice),
-        imgUrl: menuForm.imgUrl.trim(),
-      };
-
-      if (!payload.menuName || !payload.menuCategoryId || !payload.basePrice) {
-        throw new Error("Vui lòng nhập đầy đủ thông tin bắt buộc.");
-      }
+      const body = buildMenuFormData({ includeStatus: true });
 
       const res = await fetch(`${API_URL}/api/menu/${selectedMenu.menuId}`, {
         method: "PUT",
-        headers: {
-          accept: "*/*",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+        headers: { accept: "*/*" },
+        body,
       });
 
       const data = await res.json().catch(() => ({}));
@@ -332,11 +466,7 @@ export default function OwnerMenu() {
       await fetchData();
 
       toast.success("Cập nhật menu thành công.");
-
-      setTimeout(() => {
-        setOpenDetailModal(false);
-        setSelectedMenu(null);
-      }, 700);
+      closeAllModals();
     } catch (err) {
       toast.error(err.message || "Đã có lỗi xảy ra");
     } finally {
@@ -369,21 +499,15 @@ export default function OwnerMenu() {
         headers: { accept: "*/*" },
       });
 
-      let data = {};
-      try {
-        data = await res.json();
-      } catch {
-        data = {};
-      }
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         throw new Error(data?.message || "Xóa menu thất bại");
       }
 
       await fetchData();
-      setOpenDetailModal(false);
-      setSelectedMenu(null);
       toast.success("Xóa menu thành công.");
+      closeAllModals();
     } catch (err) {
       toast.error(err.message || "Đã có lỗi xảy ra");
     } finally {
@@ -399,6 +523,21 @@ export default function OwnerMenu() {
         selectedDishIds: exists
           ? prev.selectedDishIds.filter((id) => Number(id) !== Number(dishId))
           : [...prev.selectedDishIds, Number(dishId)],
+      };
+    });
+  };
+
+  const togglePartyCategoryId = (value) => {
+    const numericValue = Number(value);
+    if (!numericValue) return;
+
+    setMenuForm((prev) => {
+      const exists = prev.partyCategoryIds.includes(numericValue);
+      return {
+        ...prev,
+        partyCategoryIds: exists
+          ? prev.partyCategoryIds.filter((id) => Number(id) !== numericValue)
+          : [...prev.partyCategoryIds, numericValue],
       };
     });
   };
@@ -424,6 +563,7 @@ export default function OwnerMenu() {
           searchValue={search}
           onSearchChange={setSearch}
           searchPlaceholder="Tìm menu"
+          onMailClick={() => setOpenChat(true)}
         />
 
         <main className="px-7 py-6">
@@ -474,9 +614,11 @@ export default function OwnerMenu() {
                           }
                           className="h-11 w-full rounded-xl border border-gray-200 bg-[#FFFDFC] px-3 text-sm text-gray-700 outline-none transition focus:border-[#E8712E]"
                         >
-                          <option value="all">Tất cả</option>
-                          <option value="AVAILABLE">AVAILABLE</option>
-                          <option value="UNAVAILABLE">UNAVAILABLE</option>
+                          {STATUS_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
                         </select>
                       </div>
 
@@ -546,15 +688,6 @@ export default function OwnerMenu() {
 
               <button
                 type="button"
-                onClick={() => setOpenFilter((v) => !v)}
-                className="h-11 px-4 rounded-lg border border-[#F2B9A5] bg-[#FFFAF0] text-[#E8712E] font-semibold text-sm flex items-center gap-2 hover:bg-[#FFF3EA] transition"
-              >
-                <SlidersHorizontal className="h-4 w-4" />
-                Lọc
-              </button>
-
-              <button
-                type="button"
                 onClick={openCreateModal}
                 className="h-11 px-4 rounded-lg bg-[#E8712E] text-white font-semibold text-sm flex items-center gap-2 hover:opacity-90 transition"
               >
@@ -572,7 +705,7 @@ export default function OwnerMenu() {
             <div className="text-sm text-gray-500">Không có menu phù hợp.</div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-              {filteredMenus.map((menu) => (
+              {menus.map((menu) => (
                 <MenuCard
                   key={menu.menuId}
                   menu={menu}
@@ -586,361 +719,361 @@ export default function OwnerMenu() {
       </div>
 
       {openAddModal && (
-        <div className="fixed inset-0 z-[100] bg-black/20 backdrop-blur-[2px] flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl max-h-[90vh] bg-white rounded-2xl shadow-xl overflow-hidden">
-            <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b bg-white">
-              <h2 className="text-lg font-bold text-gray-900">Thêm menu mới</h2>
-              <button
-                type="button"
-                onClick={closeAllModals}
-                className="p-2 rounded-full hover:bg-gray-100"
-              >
-                <X className="h-5 w-5 text-gray-600" />
-              </button>
-            </div>
-
-            <form
-              onSubmit={handleCreateMenu}
-              className="hide-scrollbar max-h-[calc(90vh-80px)] overflow-y-auto p-6 space-y-5"
-            >
-              <div className="flex flex-col items-center gap-3 pb-1">
-                <div className="h-44 w-full overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 flex items-center justify-center">
-                  {menuImagePreview ? (
-                    <img
-                      src={menuImagePreview}
-                      alt="preview"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-sm text-gray-400">
-                      Chưa có ảnh menu
-                    </span>
-                  )}
-                </div>
-
-                <label className="inline-flex cursor-pointer items-center rounded-lg border border-[#F2B9A5] bg-[#FFFAF0] px-4 py-2 text-sm font-semibold text-[#E8712E] hover:bg-[#FFF3EA] transition">
-                  Chọn ảnh từ máy
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleMenuImageChange}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-
-              <Field
-                label="Tên menu"
-                value={menuForm.menuName}
-                onChange={(v) =>
-                  setMenuForm((prev) => ({ ...prev, menuName: v }))
-                }
-                required
-              />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Loại menu
-                  </label>
-                  <select
-                    value={menuForm.menuCategoryId}
-                    onChange={(e) =>
-                      setMenuForm((prev) => ({
-                        ...prev,
-                        menuCategoryId: e.target.value,
-                      }))
-                    }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
-                  >
-                    <option value="">Chọn loại menu</option>
-                    {menuCategoryOptions.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Loại tiệc
-                  </label>
-                  <select
-                    value={menuForm.partyCategoryName}
-                    onChange={(e) =>
-                      setMenuForm((prev) => ({
-                        ...prev,
-                        partyCategoryName: e.target.value,
-                      }))
-                    }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
-                  >
-                    <option value="">Chọn loại tiệc</option>
-                    {partyCategoryOptions.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <Field
-                label="Giá cơ bản"
-                type="number"
-                value={menuForm.basePrice}
-                onChange={(v) =>
-                  setMenuForm((prev) => ({ ...prev, basePrice: v }))
-                }
-                required
-              />
-
-              <Field
-                label="Ảnh menu (URL lưu backend)"
-                value={menuForm.imgUrl}
-                onChange={(v) =>
-                  setMenuForm((prev) => ({ ...prev, imgUrl: v }))
-                }
-              />
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Chọn món cho menu
-                </label>
-                <div className="max-h-64 overflow-y-auto rounded-xl border border-gray-200 p-3 space-y-2">
-                  {dishes.map((dish) => {
-                    const checked = menuForm.selectedDishIds.includes(
-                      Number(dish.dishId),
-                    );
-
-                    return (
-                      <label
-                        key={dish.dishId}
-                        className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-gray-50"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleDishSelection(dish.dishId)}
-                        />
-                        <span className="text-sm text-gray-800">
-                          {dish.dishName}
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={closeAllModals}
-                  className="h-10 px-4 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="h-10 px-4 rounded-lg bg-[#E8712E] text-white font-semibold hover:opacity-90 transition disabled:opacity-60"
-                >
-                  {submitting ? "Đang thêm..." : "Lưu menu"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <MenuModal
+          title="Thêm menu mới"
+          menuForm={menuForm}
+          setMenuForm={setMenuForm}
+          existingMenuImages={existingMenuImages}
+          newMenuImagePreviews={newMenuImagePreviews}
+          onImageChange={handleMenuImageChange}
+          dishes={dishes}
+          menuCategories={menuCategories}
+          partyCategories={partyCategories}
+          loadingCategories={loadingCategories}
+          categoryError={categoryError}
+          removeNewMenuImage={removeNewMenuImage}
+          removeExistingMenuImage={removeExistingMenuImage}
+          toggleDishSelection={toggleDishSelection}
+          togglePartyCategoryId={togglePartyCategoryId}
+          onClose={closeAllModals}
+          onSubmit={handleCreateMenu}
+          submitting={submitting}
+          submitLabel={submitting ? "Đang thêm..." : "Lưu menu"}
+          showStatus={false}
+        />
       )}
 
       {openDetailModal && selectedMenu && (
-        <div className="fixed inset-0 z-[100] bg-black/20 backdrop-blur-[2px] flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl max-h-[90vh] bg-white rounded-2xl shadow-xl overflow-hidden">
-            <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b bg-white">
-              <h2 className="text-lg font-bold text-gray-900">Chi tiết menu</h2>
-              <button
-                type="button"
-                onClick={closeAllModals}
-                className="p-2 rounded-full hover:bg-gray-100"
+        <MenuModal
+          title="Chi tiết menu"
+          menuForm={menuForm}
+          setMenuForm={setMenuForm}
+          existingMenuImages={existingMenuImages}
+          newMenuImagePreviews={newMenuImagePreviews}
+          onImageChange={handleMenuImageChange}
+          dishes={dishes}
+          menuCategories={menuCategories}
+          partyCategories={partyCategories}
+          loadingCategories={loadingCategories}
+          categoryError={categoryError}
+          removeNewMenuImage={removeNewMenuImage}
+          removeExistingMenuImage={removeExistingMenuImage}
+          toggleDishSelection={toggleDishSelection}
+          togglePartyCategoryId={togglePartyCategoryId}
+          onClose={closeAllModals}
+          onSubmit={handleUpdateMenu}
+          submitting={updating}
+          submitLabel={updating ? "Đang lưu..." : "Cập nhật"}
+          showStatus
+          footerLeft={
+            <button
+              type="button"
+              onClick={handleDeleteMenu}
+              disabled={deleting}
+              className="h-10 px-4 rounded-lg bg-red-50 text-red-600 font-semibold flex items-center gap-2 hover:bg-red-100 transition disabled:opacity-60"
+            >
+              <Trash2 className="h-4 w-4" />
+              {deleting ? "Đang xóa..." : "Xóa menu"}
+            </button>
+          }
+        />
+      )}
+
+      <ChatPanel open={openChat} onClose={() => setOpenChat(false)} />
+    </div>
+  );
+}
+
+function MenuModal({
+  title,
+  menuForm,
+  setMenuForm,
+  existingMenuImages,
+  newMenuImagePreviews,
+  onImageChange,
+  dishes,
+  menuCategories,
+  partyCategories,
+  loadingCategories,
+  categoryError,
+  removeNewMenuImage,
+  removeExistingMenuImage,
+  toggleDishSelection,
+  togglePartyCategoryId,
+  onClose,
+  onSubmit,
+  submitting,
+  submitLabel,
+  showStatus,
+  footerLeft = null,
+}) {
+  const allPreviewImages = [
+    ...existingMenuImages.map((src) => ({ src, type: "existing" })),
+    ...newMenuImagePreviews.map((src) => ({ src, type: "new" })),
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/20 backdrop-blur-[2px] flex items-center justify-center p-4">
+      <div className="w-full max-w-2xl max-h-[90vh] bg-white rounded-2xl shadow-xl overflow-hidden">
+        <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b bg-white">
+          <h2 className="text-lg font-bold text-gray-900">{title}</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-gray-100"
+          >
+            <X className="h-5 w-5 text-gray-600" />
+          </button>
+        </div>
+
+        <form
+          onSubmit={onSubmit}
+          className="hide-scrollbar max-h-[calc(90vh-80px)] overflow-y-auto p-6 space-y-5"
+        >
+          <div className="space-y-3 pb-1">
+            {allPreviewImages.length > 0 ? (
+              <div className="overflow-x-auto pb-2">
+                <div
+                  className={`flex gap-3 ${allPreviewImages.length <= 2 ? "sm:grid sm:grid-cols-2" : ""}`}
+                >
+                  {allPreviewImages.map((image, index) => (
+                    <div
+                      key={`${image.type}-${image.src}-${index}`}
+                      className="relative h-44 min-w-[260px] sm:min-w-0 overflow-hidden rounded-2xl border border-gray-200 bg-gray-50"
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          image.type === "existing"
+                            ? removeExistingMenuImage(index)
+                            : removeNewMenuImage(
+                                index - existingMenuImages.length,
+                              )
+                        }
+                        className="absolute right-2 top-2 z-10 rounded-full bg-white/90 p-1 text-gray-600 shadow-sm hover:bg-white"
+                      >
+                        ✕
+                      </button>
+                      <img
+                        src={image.src}
+                        alt={`menu-preview-${index}`}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="h-44 w-full overflow-hidden rounded-2xl border border-dashed border-gray-300 bg-gray-50 flex items-center justify-center text-sm text-gray-400">
+                Chưa có ảnh menu
+              </div>
+            )}
+
+            <label className="inline-flex cursor-pointer items-center rounded-lg border border-[#F2B9A5] bg-[#FFFAF0] px-4 py-2 text-sm font-semibold text-[#E8712E] hover:bg-[#FFF3EA] transition">
+              Chọn ảnh từ máy
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={onImageChange}
+                className="hidden"
+              />
+            </label>
+          </div>
+
+          <Field
+            label="Tên menu"
+            value={menuForm.menuName}
+            onChange={(v) => setMenuForm((prev) => ({ ...prev, menuName: v }))}
+            required
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Loại menu
+              </label>
+              <select
+                value={menuForm.menuCategoryId}
+                onChange={(e) =>
+                  setMenuForm((prev) => ({
+                    ...prev,
+                    menuCategoryId: e.target.value,
+                  }))
+                }
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
+                required
               >
-                <X className="h-5 w-5 text-gray-600" />
-              </button>
+                <option value="">Chọn loại menu</option>
+                {menuCategories.map((category) => {
+                  const id = getMenuCategoryId(category);
+                  const label = getMenuCategoryLabel(category);
+                  return (
+                    <option key={id} value={String(id)}>
+                      {label}
+                    </option>
+                  );
+                })}
+              </select>
+              {loadingCategories && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Đang tải danh mục menu...
+                </p>
+              )}
+              {categoryError && (
+                <p className="mt-1 text-xs text-red-500">{categoryError}</p>
+              )}
             </div>
 
-            <form
-              onSubmit={handleUpdateMenu}
-              className="hide-scrollbar max-h-[calc(90vh-80px)] overflow-y-auto p-6 space-y-5"
-            >
-              <div className="flex flex-col items-center gap-3 pb-1">
-                <div className="h-44 w-full overflow-hidden rounded-2xl border border-gray-200 bg-gray-50 flex items-center justify-center">
-                  {menuImagePreview ? (
-                    <img
-                      src={menuImagePreview}
-                      alt="preview"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-sm text-gray-400">
-                      Chưa có ảnh menu
-                    </span>
-                  )}
-                </div>
-
-                <label className="inline-flex cursor-pointer items-center rounded-lg border border-[#F2B9A5] bg-[#FFFAF0] px-4 py-2 text-sm font-semibold text-[#E8712E] hover:bg-[#FFF3EA] transition">
-                  Chọn ảnh từ máy
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleMenuImageChange}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-
-              <Field
-                label="Tên menu"
-                value={menuForm.menuName}
-                onChange={(v) =>
-                  setMenuForm((prev) => ({ ...prev, menuName: v }))
-                }
-                required
-              />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Loại menu
-                  </label>
-                  <select
-                    value={menuForm.menuCategoryId}
-                    onChange={(e) =>
-                      setMenuForm((prev) => ({
-                        ...prev,
-                        menuCategoryId: e.target.value,
-                      }))
-                    }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
-                  >
-                    <option value="">Chọn loại menu</option>
-                    {menuCategoryOptions.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Loại tiệc
-                  </label>
-                  <select
-                    value={menuForm.partyCategoryName}
-                    onChange={(e) =>
-                      setMenuForm((prev) => ({
-                        ...prev,
-                        partyCategoryName: e.target.value,
-                      }))
-                    }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
-                  >
-                    <option value="">Chọn loại tiệc</option>
-                    {partyCategoryOptions.map((item) => (
-                      <option key={item.value} value={item.value}>
-                        {item.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <Field
-                label="Giá cơ bản"
-                type="number"
-                value={menuForm.basePrice}
-                onChange={(v) =>
-                  setMenuForm((prev) => ({ ...prev, basePrice: v }))
-                }
-                required
-              />
-
-              <Field
-                label="Ảnh menu (URL lưu backend)"
-                value={menuForm.imgUrl}
-                onChange={(v) =>
-                  setMenuForm((prev) => ({ ...prev, imgUrl: v }))
-                }
-              />
-
+            {showStatus && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Chọn món cho menu
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status
                 </label>
-                <div className="max-h-64 overflow-y-auto rounded-xl border border-gray-200 p-3 space-y-2">
-                  {dishes.map((dish) => {
-                    const checked = menuForm.selectedDishIds.includes(
-                      Number(dish.dishId),
-                    );
+                <select
+                  value={menuForm.status}
+                  onChange={(e) =>
+                    setMenuForm((prev) => ({ ...prev, status: e.target.value }))
+                  }
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
+                >
+                  <option value="1">1 - Hoạt động</option>
+                  <option value="0">0 - Ngưng hoạt động</option>
+                </select>
+              </div>
+            )}
+          </div>
 
+          <Field
+            label="BasePrice"
+            type="number"
+            value={menuForm.basePrice}
+            onChange={(v) => setMenuForm((prev) => ({ ...prev, basePrice: v }))}
+            required
+          />
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Loại tiệc
+            </label>
+            <div className="rounded-xl border border-gray-200 p-3 space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {menuForm.partyCategoryIds.length > 0 ? (
+                  menuForm.partyCategoryIds.map((id) => {
+                    const category = partyCategories.find(
+                      (item) => Number(getPartyCategoryId(item)) === Number(id),
+                    );
+                    const label = category
+                      ? getPartyCategoryLabelOption(category)
+                      : `ID: ${id}`;
+                    return (
+                      <span
+                        key={id}
+                        className="rounded-full bg-[#FFF3EA] px-3 py-1 text-sm text-[#E8712E]"
+                      >
+                        {label}
+                      </span>
+                    );
+                  })
+                ) : (
+                  <span className="text-sm text-gray-400">
+                    Chưa chọn loại tiệc
+                  </span>
+                )}
+              </div>
+
+              <div className="grid gap-2 max-h-60 overflow-y-auto">
+                {partyCategories.length > 0 ? (
+                  partyCategories.map((category) => {
+                    const id = getPartyCategoryId(category);
+                    const label = getPartyCategoryLabelOption(category);
+                    const checked = menuForm.partyCategoryIds.includes(
+                      Number(id),
+                    );
                     return (
                       <label
-                        key={dish.dishId}
-                        className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-gray-50"
+                        key={id}
+                        className="flex items-center gap-3 rounded-lg border border-gray-200 px-3 py-2 hover:bg-gray-50"
                       >
                         <input
                           type="checkbox"
                           checked={checked}
-                          onChange={() => toggleDishSelection(dish.dishId)}
+                          onChange={() => togglePartyCategoryId(id)}
                         />
-                        <span className="text-sm text-gray-800">
-                          {dish.dishName}
-                        </span>
+                        <span className="text-sm text-gray-800">{label}</span>
                       </label>
                     );
-                  })}
-                </div>
+                  })
+                ) : (
+                  <div className="text-sm text-gray-500">
+                    {loadingCategories
+                      ? "Đang tải loại tiệc..."
+                      : "Không có loại tiệc khả dụng."}
+                  </div>
+                )}
               </div>
-
-              <div className="flex justify-between gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={handleDeleteMenu}
-                  disabled={deleting}
-                  className="h-10 px-4 rounded-lg bg-red-50 text-red-600 font-semibold flex items-center gap-2 hover:bg-red-100 transition disabled:opacity-60"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  {deleting ? "Đang xóa..." : "Xóa menu"}
-                </button>
-
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={closeAllModals}
-                    className="h-10 px-4 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition"
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={updating}
-                    className="h-10 px-4 rounded-lg bg-[#E8712E] text-white font-semibold flex items-center gap-2 hover:opacity-90 transition disabled:opacity-60"
-                  >
-                    <Pencil className="h-4 w-4" />
-                    {updating ? "Đang lưu..." : "Cập nhật"}
-                  </button>
-                </div>
-              </div>
-            </form>
+            </div>
           </div>
-        </div>
-      )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Chọn món cho menu
+            </label>
+            <div className="max-h-64 overflow-y-auto rounded-xl border border-gray-200 p-3 space-y-2">
+              {dishes.map((dish) => {
+                const checked = menuForm.selectedDishIds.includes(
+                  Number(dish.dishId),
+                );
+
+                return (
+                  <label
+                    key={dish.dishId}
+                    className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-gray-50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleDishSelection(dish.dishId)}
+                    />
+                    <span className="text-sm text-gray-800">
+                      {dish.dishName}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex justify-between gap-3 pt-2">
+            <div>{footerLeft}</div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="h-10 px-4 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="h-10 px-4 rounded-lg bg-[#E8712E] text-white font-semibold hover:opacity-90 transition disabled:opacity-60"
+              >
+                {submitLabel}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
 
 function MenuCard({ menu, previewItems, onClick }) {
-  const imgSrc = getMenuImageUrl(menu.imgUrl);
+  const imgUrls = normalizeImageUrls(menu.imgUrl);
+  const firstImage = imgUrls[0] || "";
+  const partyLabel = getPartyCategoryLabel(menu);
 
   return (
     <button
@@ -957,51 +1090,75 @@ function MenuCard({ menu, previewItems, onClick }) {
               {menu.menuCategoryName}
             </span>
           )}
-          {menu.partyCategoryName && (
+          {partyLabel && (
             <span className="rounded-full bg-[#F5F5F5] px-2 py-1 text-gray-600">
-              {menu.partyCategoryName}
+              {partyLabel}
             </span>
           )}
+          <span className="rounded-full bg-[#F5F5F5] px-2 py-1 text-gray-600">
+            {getStatusLabel(menu.status)}
+          </span>
         </div>
       </div>
 
       <div className="px-6 pt-4">
-        <div className="h-44 w-full overflow-hidden rounded-xl bg-white shadow-[0_6px_18px_rgba(0,0,0,0.08)]">
-          <img
-            src={imgSrc}
-            alt={menu.menuName}
-            className="h-full w-full object-cover"
-          />
+        <div className="h-44 w-full overflow-hidden rounded-xl bg-white shadow-[0_6px_18px_rgba(0,0,0,0.08)] flex items-center justify-center">
+          {firstImage ? (
+            <img
+              src={firstImage}
+              alt={menu.menuName}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <span className="text-sm text-gray-400">Không có ảnh</span>
+          )}
         </div>
       </div>
 
       <div className="px-6 py-4">
-        <div className="space-y-5">
-          {previewItems.map((it) => (
-            <div key={it.dishId} className="flex items-start gap-4">
-              <div className="h-20 w-20 rounded-full bg-white shadow-[0_10px_20px_rgba(0,0,0,0.18)] overflow-hidden flex-none">
-                <img
-                  src={getDishImageUrl(it.img)}
-                  alt={it.dishName}
-                  className="h-full w-full object-cover"
-                />
-              </div>
+        <div className="mb-3 flex items-center justify-between">
+          <div className="text-sm font-semibold text-gray-900">
+            Danh sách món
+          </div>
+          <div className="text-xs text-gray-500">{previewItems.length} món</div>
+        </div>
 
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-gray-900">
-                  {it.dishName}
+        <div className="hide-scrollbar max-h-80 overflow-y-auto pr-1 space-y-5">
+          {previewItems.length > 0 ? (
+            previewItems.map((it) => (
+              <div key={it.dishId} className="flex items-start gap-4">
+                <div className="h-20 w-20 rounded-full bg-white shadow-[0_10px_20px_rgba(0,0,0,0.18)] overflow-hidden flex-none flex items-center justify-center">
+                  {getDishImageUrl(it.img) ? (
+                    <img
+                      src={getDishImageUrl(it.img)}
+                      alt={it.dishName}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-[10px] text-gray-400">No image</span>
+                  )}
                 </div>
-                <div className="text-xs text-gray-400 whitespace-pre-line leading-relaxed">
-                  {it.description || it.note || "Không có mô tả"}
+
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-gray-900">
+                    {it.dishName}
+                  </div>
+                  <div className="text-xs text-gray-400 whitespace-pre-line leading-relaxed">
+                    {it.description || it.note || "Không có mô tả"}
+                  </div>
                 </div>
               </div>
+            ))
+          ) : (
+            <div className="text-sm text-gray-400">
+              Chưa có món nào trong menu
             </div>
-          ))}
+          )}
         </div>
       </div>
 
       <div className="px-6 py-4 border-t border-[#F1F2F6] flex items-center justify-between">
-        <div className="text-xs text-gray-500">{previewItems.length} món</div>
+        <div className="text-xs text-gray-500">Menu #{menu.menuId}</div>
         <div className="text-sm font-bold text-[#E54B2D]">
           {formatPrice(menu.basePrice)}
         </div>
@@ -1027,6 +1184,40 @@ function Field({ label, value, onChange, required = false, type = "text" }) {
   );
 }
 
+function extractItems(data) {
+  if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.data?.items)) return data.data.items;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data)) return data;
+  return [];
+}
+
+function getMenuCategoryId(category) {
+  return category.menuCategoryId ?? category.id ?? category.categoryId ?? "";
+}
+
+function getMenuCategoryLabel(category) {
+  return (
+    category.menuCategoryName ||
+    category.categoryName ||
+    category.name ||
+    String(getMenuCategoryId(category))
+  );
+}
+
+function getPartyCategoryId(category) {
+  return category.partyCategoryId ?? category.id ?? category.categoryId ?? "";
+}
+
+function getPartyCategoryLabelOption(category) {
+  return (
+    category.partyCategoryName ||
+    category.categoryName ||
+    category.name ||
+    String(getPartyCategoryId(category))
+  );
+}
+
 function formatPrice(price) {
   const value = Number(price || 0);
   return `${value.toLocaleString("vi-VN")} VNĐ`;
@@ -1039,26 +1230,62 @@ function formatDate(dateString) {
   return date.toLocaleDateString("vi-VN");
 }
 
-function getMenuImageUrl(img) {
-  if (!img || typeof img !== "string") {
-    return "https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=800&q=70";
+function normalizeStatusValue(status) {
+  if (status === 0 || status === "0") return 0;
+  return 1;
+}
+
+function getStatusLabel(status) {
+  return normalizeStatusValue(status) === 1 ? "Hoạt động" : "Ngưng hoạt động";
+}
+
+function normalizeIdArray(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => Number(item))
+    .filter((item) => Number.isFinite(item) && item > 0);
+}
+
+function normalizeImageUrls(img) {
+  if (Array.isArray(img)) {
+    return img.filter(Boolean);
   }
 
-  if (img.startsWith("http://") || img.startsWith("https://")) {
-    return img;
+  if (typeof img === "string" && img.trim()) {
+    if (img.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(img);
+        return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+      } catch {
+        return [img];
+      }
+    }
+    return [img];
   }
 
-  return `${API_URL}${img}`;
+  return [];
+}
+
+function getPartyCategoryLabel(menu) {
+  if (
+    Array.isArray(menu.partyCategoryNames) &&
+    menu.partyCategoryNames.length > 0
+  ) {
+    return menu.partyCategoryNames.join(", ");
+  }
+
+  if (
+    typeof menu.partyCategoryName === "string" &&
+    menu.partyCategoryName.trim()
+  ) {
+    return menu.partyCategoryName;
+  }
+
+  return "";
 }
 
 function getDishImageUrl(img) {
-  if (!img) {
-    return "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?auto=format&fit=crop&w=200&q=60";
-  }
-
-  if (img.startsWith("http://") || img.startsWith("https://")) {
-    return img;
-  }
-
+  if (!img) return "";
+  if (img.startsWith("http://") || img.startsWith("https://")) return img;
   return `${API_URL}${img}`;
 }
