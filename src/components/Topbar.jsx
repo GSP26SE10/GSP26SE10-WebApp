@@ -1,5 +1,13 @@
 import React from "react";
-import { Search, Mail, Bell, ChevronDown } from "lucide-react";
+import {
+  Search,
+  Mail,
+  Bell,
+  ChevronDown,
+  Settings,
+  LogOut,
+  UserCircle2,
+} from "lucide-react";
 import API_URL from "@/config/api";
 import ChatPanel from "@/components/ChatPanel";
 
@@ -11,16 +19,21 @@ export default function Topbar({
   onSearchChange,
   searchPlaceholder = "Tìm",
   actions,
-  avatarSrc = "https://gocnhobecon.com/wp-content/uploads/2025/08/meme-con-meo-cuoi.webp",
+  avatarSrc = "",
   onMailClick,
   unreadCount = 0,
+  userName = "Người dùng",
+  userEmail = "",
 }) {
   const [openChat, setOpenChat] = React.useState(false);
   const [notificationOpen, setNotificationOpen] = React.useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = React.useState(false);
   const [notifications, setNotifications] = React.useState([]);
   const [loadingNotifications, setLoadingNotifications] = React.useState(true);
   const [notificationError, setNotificationError] = React.useState("");
+
   const notificationRef = React.useRef(null);
+  const userRef = React.useRef(null);
 
   const token =
     localStorage.getItem("accessToken") ||
@@ -49,6 +62,7 @@ export default function Topbar({
           headers: authHeaders,
         },
       );
+
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
@@ -62,7 +76,7 @@ export default function Topbar({
     } finally {
       setLoadingNotifications(false);
     }
-  }, []);
+  }, [authHeaders]);
 
   React.useEffect(() => {
     fetchNotifications();
@@ -107,15 +121,33 @@ export default function Topbar({
 
   const markAllNotificationsRead = async () => {
     const unread = notifications.filter((item) => !item.isRead);
-    await Promise.all(
-      unread.map((item) =>
-        fetch(`${API_URL}/api/notification/${item.notificationId}/read`, {
-          method: "PATCH",
-          headers: authHeaders,
-        }),
-      ),
-    );
-    setNotifications((prev) => prev.map((item) => ({ ...item, isRead: true })));
+
+    try {
+      await Promise.all(
+        unread.map((item) =>
+          fetch(`${API_URL}/api/notification/${item.notificationId}/read`, {
+            method: "PATCH",
+            headers: authHeaders,
+          }),
+        ),
+      );
+
+      setNotifications((prev) =>
+        prev.map((item) => ({ ...item, isRead: true })),
+      );
+    } catch (err) {
+      setNotificationError(err.message || "Không thể cập nhật thông báo");
+    }
+  };
+
+  const handleGoAccount = () => {
+    window.location.href = "/owner/account";
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("accessToken");
+    sessionStorage.removeItem("accessToken");
+    window.location.href = "/login";
   };
 
   React.useEffect(() => {
@@ -127,13 +159,21 @@ export default function Topbar({
       ) {
         setNotificationOpen(false);
       }
+
+      if (
+        userDropdownOpen &&
+        userRef.current &&
+        !userRef.current.contains(event.target)
+      ) {
+        setUserDropdownOpen(false);
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [notificationOpen]);
+  }, [notificationOpen, userDropdownOpen]);
 
   return (
     <>
@@ -218,6 +258,7 @@ export default function Topbar({
                       Đánh dấu tất cả đã đọc
                     </button>
                   </div>
+
                   <div className="space-y-1 p-2">
                     {notificationError && (
                       <div className="rounded-xl bg-red-50 p-3 text-sm text-red-600">
@@ -267,19 +308,79 @@ export default function Topbar({
               )}
             </div>
 
-            <div className="flex items-center gap-2">
-              <img
-                src={avatarSrc}
-                alt="avatar"
-                className="h-9 w-9 rounded-full object-cover"
-              />
-              <button className="hidden md:inline-flex items-center gap-1 text-sm text-gray-700">
-                <ChevronDown className="h-4 w-4" />
+            <div className="relative" ref={userRef}>
+              <button
+                type="button"
+                onClick={() => setUserDropdownOpen((prev) => !prev)}
+                className="flex items-center gap-2 rounded-full hover:bg-gray-50 pl-1 pr-2 py-1 transition"
+              >
+                {avatarSrc ? (
+                  <img
+                    src={avatarSrc}
+                    alt="avatar"
+                    className="h-9 w-9 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="h-9 w-9 rounded-full bg-[#FFF3EA] flex items-center justify-center">
+                    <UserCircle2 className="h-6 w-6 text-[#E8712E]" />
+                  </div>
+                )}
+
+                <div className="hidden md:block text-left">
+                  <div className="max-w-[140px] truncate text-sm font-medium text-gray-800">
+                    {userName}
+                  </div>
+                  <div className="max-w-[140px] truncate text-xs text-gray-400">
+                    {userEmail}
+                  </div>
+                </div>
+
+                <ChevronDown
+                  className={`h-4 w-4 text-gray-600 transition-transform duration-200 ${
+                    userDropdownOpen ? "rotate-180" : ""
+                  }`}
+                />
               </button>
+
+              <div
+                className={`absolute right-0 top-14 w-56 origin-top-right rounded-2xl border border-gray-200 bg-white shadow-xl transition-all duration-200 ${
+                  userDropdownOpen
+                    ? "pointer-events-auto translate-y-0 opacity-100 scale-100"
+                    : "pointer-events-none -translate-y-1 opacity-0 scale-95"
+                }`}
+              >
+                <div className="border-b border-gray-100 px-4 py-3">
+                  <div className="truncate text-sm font-semibold text-gray-900">
+                    {userName}
+                  </div>
+                  <div className="truncate text-xs text-gray-500">
+                    {userEmail}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGoAccount}
+                  className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 transition"
+                >
+                  <Settings className="h-4 w-4" />
+                  Cài đặt tài khoản
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 transition"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Đăng xuất
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </header>
+
       {!onMailClick && (
         <ChatPanel open={openChat} onClose={() => setOpenChat(false)} />
       )}

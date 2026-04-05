@@ -363,9 +363,6 @@ export default function OwnerIngredient() {
                           <div className="font-semibold text-[#2F3A67]">
                             {item.ingredientName}
                           </div>
-                          <div className="mt-1 text-xs text-[#8DA1C1]">
-                            ID: #{item.ingredientId}
-                          </div>
                         </td>
 
                         <td className="px-4 py-4 align-middle">

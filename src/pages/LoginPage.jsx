@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Lock, User } from "lucide-react";
 import API_URL from "@/config/api";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { hubConnection } from "@/signalr/connection";
 
 export default function LoginPage() {
@@ -25,6 +25,13 @@ export default function LoginPage() {
   const [remember, setRemember] = React.useState(true);
 
   const navigate = useNavigate();
+  const authToken =
+    localStorage.getItem("accessToken") ||
+    sessionStorage.getItem("accessToken");
+
+  if (authToken) {
+    return <Navigate to="/owner/dashboard" replace />;
+  }
 
   const canSubmit =
     identifier.trim().length > 0 && password.length > 0 && !isLoading;
@@ -112,7 +119,7 @@ export default function LoginPage() {
       //   console.log("chatHub connected:", hubConnection.connectionId);
       // }
 
-      navigate("/owner/dashboard");
+      navigate("/owner/dashboard", { replace: true });
     } catch (err) {
       console.error(err);
       setError(err?.message || "Đăng nhập thất bại. Vui lòng thử lại.");

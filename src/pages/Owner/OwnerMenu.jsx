@@ -937,8 +937,8 @@ function MenuModal({
                   }
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
                 >
-                  <option value="1">1 - Hoạt động</option>
-                  <option value="0">0 - Ngưng hoạt động</option>
+                  <option value="1">Hoạt động</option>
+                  <option value="0">Ngưng hoạt động</option>
                 </select>
               </div>
             )}

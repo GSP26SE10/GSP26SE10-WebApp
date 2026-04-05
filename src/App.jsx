@@ -6,6 +6,7 @@ import {
   Routes,
   Route,
   Navigate,
+  Outlet,
 } from "react-router-dom";
 import LoginPage from "@/pages/LoginPage";
 import OwnerDashboard from "@/pages/Owner/OwnerDashboard";
@@ -19,15 +20,28 @@ import OwnerPartyCategory from "./pages/Owner/OwnerPartyCategory";
 import OwnerIngredient from "./pages/Owner/OwnerIngredient";
 import OwnerStaffManagement from "./pages/Owner/OwnerStaffManagment";
 import OwnerStaffSchedule from "./pages/Owner/OwnerStaffSchedule";
+import OwnerAccountPage from "./pages/Owner/OwnerAccountPage";
+function RequireAuth({ children }) {
+  const token =
+    localStorage.getItem("accessToken") ||
+    sessionStorage.getItem("accessToken");
+
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children ?? <Outlet />;
+}
+
 export default function App() {
   return (
     <Router>
       <div>
         <main>
           <Routes>
-            <Route path="/" element={<Navigate to="/login" />} />
+            <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/owner">
+            <Route path="/owner" element={<RequireAuth />}>
               <Route path="dashboard" element={<OwnerDashboard />} />
               <Route path="menu" element={<OwnerMenu />} />
               <Route path="dish" element={<OwnerDish />} />
@@ -39,6 +53,7 @@ export default function App() {
               <Route path="ingredient" element={<OwnerIngredient />} />
               <Route path="staff" element={<OwnerStaffManagement />} />
               <Route path="staff-schedule" element={<OwnerStaffSchedule />} />
+              <Route path="account" element={<OwnerAccountPage />} />
             </Route>
           </Routes>
           <Toaster />
