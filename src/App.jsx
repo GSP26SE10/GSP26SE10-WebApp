@@ -21,6 +21,9 @@ import OwnerIngredient from "./pages/Owner/OwnerIngredient";
 import OwnerStaffManagement from "./pages/Owner/OwnerStaffManagment";
 import OwnerStaffSchedule from "./pages/Owner/OwnerStaffSchedule";
 import OwnerAccountPage from "./pages/Owner/OwnerAccountPage";
+import OwnerBlog from "./pages/Owner/OwnerBlog";
+import OwnerFeedback from "./pages/Owner/OwnerFeedback";
+import OwnerTaskTemplate from "./pages/Owner/OwnerTaskTemplate";
 function RequireAuth({ children }) {
   const token =
     localStorage.getItem("accessToken") ||
@@ -54,6 +57,9 @@ export default function App() {
               <Route path="staff" element={<OwnerStaffManagement />} />
               <Route path="staff-schedule" element={<OwnerStaffSchedule />} />
               <Route path="account" element={<OwnerAccountPage />} />
+              <Route path="blog" element={<OwnerBlog />} />
+              <Route path="feedback" element={<OwnerFeedback />} />
+              <Route path="task-template" element={<OwnerTaskTemplate />} />
             </Route>
           </Routes>
           <Toaster />

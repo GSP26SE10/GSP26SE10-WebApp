@@ -15,6 +15,9 @@ import {
   Users,
   CalendarDays,
   User,
+  NotebookPen,
+  MessageSquareMore,
+  ReceiptText,
 } from "lucide-react";
 
 export default function Sidebar({ onExpandChange }) {
@@ -57,7 +60,7 @@ export default function Sidebar({ onExpandChange }) {
     <aside
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
-      className={`fixed left-0 top-0 z-50 h-screen bg-white border-r font-main flex flex-col
+      className={`hide-scrollbar fixed left-0 top-0 z-50 h-screen bg-white border-r font-main flex flex-col
       overflow-y-auto transition-all duration-300 ease-in-out
       ${expanded ? "w-72" : "w-20"}`}
     >
@@ -128,6 +131,31 @@ export default function Sidebar({ onExpandChange }) {
             expanded={expanded}
             icon={<Warehouse className="h-4 w-4" />}
             label="Kho"
+          />
+
+          <SubItemLink
+            to="/owner/blog"
+            expanded={expanded}
+            icon={<NotebookPen className="h-4 w-4" />}
+            label="Blog"
+          />
+          <SubItemLink
+            to="/owner/feedback"
+            expanded={expanded}
+            icon={<MessageSquareMore className="h-4 w-4" />}
+            label="Feedback"
+          />
+          <SubItemLink
+            to="/owner/extra-charge"
+            expanded={expanded}
+            icon={<ReceiptText className="h-4 w-4" />}
+            label="Chi phí phát sinh"
+          />
+          <SubItemLink
+            to="/owner/task-template"
+            expanded={expanded}
+            icon={<ClipboardList className="h-4 w-4" />}
+            label="TaskTemplate"
           />
         </Dropdown>
 
