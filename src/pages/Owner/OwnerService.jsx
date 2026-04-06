@@ -358,10 +358,6 @@ export default function OwnerService() {
                 <h1 className="text-[22px] font-bold text-[#E54B2D]">
                   Quản lý dịch vụ
                 </h1>
-                <p className="mt-1 text-sm text-gray-500">
-                  Tìm kiếm trên toàn bộ dữ liệu và quản lý dịch vụ theo API hiện
-                  tại.
-                </p>
               </div>
 
               <button
@@ -539,6 +535,12 @@ function ServiceModal({
                     src={displayImage}
                     alt="service-preview"
                     className="h-full w-full object-cover"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = generateTextLogo(
+                        form.serviceName || "Logo",
+                      );
+                    }}
                   />
                   <button
                     type="button"
@@ -589,28 +591,73 @@ function ServiceModal({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Field
-              label="Giá cơ bản"
-              type="number"
-              value={form.basePrice}
-              onChange={(v) => setForm((prev) => ({ ...prev, basePrice: v }))}
-              required
-            />
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Giá cơ bản
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={formatVndInput(form.basePrice)}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      basePrice: sanitizeMoneyInput(e.target.value),
+                    }))
+                  }
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-14 outline-none focus:border-[#E8712E]"
+                  required
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+                  VNĐ
+                </span>
+              </div>
+            </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Trạng thái
               </label>
-              <select
-                value={form.status}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, status: e.target.value }))
-                }
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
-              >
-                <option value="1">Đang mở</option>
-                <option value="0">Ngừng cung cấp</option>
-              </select>
+              {showDelete ? (
+                <div className="flex flex-col">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm((prev) => ({
+                        ...prev,
+                        status: prev.status === "1" ? "0" : "1",
+                      }))
+                    }
+                    className="h-10 w-full rounded-lg bg-slate-100 px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
+                  >
+                    {form.status === "1"
+                      ? "Chuyển sang Ngừng cung cấp"
+                      : "Chuyển sang Đang mở"}
+                  </button>
+
+                  <div className="mt-1">
+                    <div
+                      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(
+                        form.status,
+                      )}`}
+                    >
+                      {getStatusLabel(form.status)}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <select
+                  value={form.status}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, status: e.target.value }))
+                  }
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
+                >
+                  <option value="1">Đang mở</option>
+                  <option value="0">Ngừng cung cấp</option>
+                </select>
+              )}
             </div>
           </div>
 
@@ -656,6 +703,10 @@ function ServiceCard({ service, onClick }) {
             src={imageUrl}
             alt={service.serviceName}
             className="h-full w-full object-cover"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = generateTextLogo(service.serviceName);
+            }}
           />
         ) : (
           <div className="h-full w-full flex items-center justify-center text-sm text-gray-400">
@@ -720,6 +771,48 @@ function normalizeServiceImage(img) {
   return `${API_URL}${img}`;
 }
 
+function generateTextLogo(name) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 100;
+  canvas.height = 100;
+  const ctx = canvas.getContext("2d");
+
+  // Background color
+  ctx.fillStyle = "#E8712E";
+  ctx.fillRect(0, 0, 100, 100);
+
+  // Text
+  ctx.fillStyle = "white";
+  ctx.font = "bold 50px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const initial = (name || "").charAt(0).toUpperCase() || "?";
+  ctx.fillText(initial, 50, 50);
+
+  return canvas.toDataURL();
+}
+
 function formatPrice(value) {
   return `${Number(value || 0).toLocaleString("vi-VN")} VNĐ`;
 }
+
+function sanitizeMoneyInput(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function formatVndInput(value) {
+  const numeric = String(value || "").replace(/\D/g, "");
+  if (!numeric) return "";
+  return Number(numeric).toLocaleString("vi-VN");
+}
+
+function getStatusBadgeClass(status) {
+  return status === "1"
+    ? "bg-green-100 text-green-700"
+    : "bg-gray-100 text-gray-700";
+}
+
+function getStatusLabel(status) {
+  return status === "1" ? "Đang mở" : "Ngừng cung cấp";
+}
+

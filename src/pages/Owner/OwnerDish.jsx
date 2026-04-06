@@ -34,7 +34,6 @@ export default function OwnerDish() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
 
-  const [openFilter, setOpenFilter] = React.useState(false);
   const [filters, setFilters] = React.useState({
     categoryId: "all",
     status: "all",
@@ -57,6 +56,7 @@ export default function OwnerDish() {
     note: "",
     description: "",
     dishCategoryId: "",
+    status: "1",
   });
 
   const [categoryForm, setCategoryForm] = React.useState({
@@ -231,10 +231,10 @@ export default function OwnerDish() {
       note: "",
       description: "",
       dishCategoryId: "",
+      status: "1",
     });
     resetDishImage();
   };
-
   const resetCategoryForm = () => {
     setCategoryForm({
       dishCategoryName: "",
@@ -281,6 +281,7 @@ export default function OwnerDish() {
       note: dish.note || "",
       description: dish.description || "",
       dishCategoryId: String(dish.dishCategoryId || ""),
+      status: String(dish.status ?? "1"),
     });
     setDishImageFile(null);
     setDishImagePreview(getImageUrl(dish.img));
@@ -308,6 +309,7 @@ export default function OwnerDish() {
     formData.append("Note", dishForm.note.trim());
     formData.append("Description", dishForm.description.trim());
     formData.append("DishCategoryId", String(Number(dishForm.dishCategoryId)));
+    formData.append("Status", String(Number(dishForm.status || 1)));
 
     if (dishImageFile) {
       formData.append("ImgFile", dishImageFile);
@@ -660,15 +662,66 @@ export default function OwnerDish() {
         />
 
         <main className="px-7 py-6 pb-10">
-          <div className="mb-6 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={() => setOpenFilter((v) => !v)}
-              className="flex h-10 items-center gap-2 rounded-lg border border-[#F2B9A5] bg-[#FFFAF0] px-4 text-sm font-semibold text-[#E8712E] transition hover:bg-[#FFF3EA]"
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              Lọc
-            </button>
+          <div className="mb-6 flex flex-wrap items-end justify-end gap-3">
+            <div className="flex items-center gap-4">
+              <div className="text-sm font-medium text-gray-700">Lọc:</div>
+
+              <select
+                value={filters.status}
+                onChange={(e) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    status: e.target.value,
+                  }))
+                }
+                className="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-[#E8712E]"
+              >
+                <option value="all">Tất cả trạng thái</option>
+                <option value="available">Đang bán</option>
+                <option value="unavailable">Ngừng bán</option>
+              </select>
+
+              <input
+                type="number"
+                value={filters.priceMin}
+                onChange={(e) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    priceMin: e.target.value,
+                  }))
+                }
+                placeholder="Giá từ"
+                className="h-10 w-32 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-[#E8712E]"
+              />
+
+              <input
+                type="number"
+                value={filters.priceMax}
+                onChange={(e) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    priceMax: e.target.value,
+                  }))
+                }
+                placeholder="Giá đến"
+                className="h-10 w-32 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-[#E8712E]"
+              />
+
+              <button
+                type="button"
+                onClick={() =>
+                  setFilters({
+                    categoryId: "all",
+                    status: "all",
+                    priceMin: "",
+                    priceMax: "",
+                  })
+                }
+                className="h-10 rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+              >
+                Đặt lại
+              </button>
+            </div>
 
             <button
               type="button"
@@ -679,121 +732,6 @@ export default function OwnerDish() {
               Thêm món
             </button>
           </div>
-
-          {openFilter && (
-            <div className="mb-6 rounded-2xl border border-[#F3D4C2] bg-white px-5 py-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-                <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Danh mục
-                    </label>
-                    <select
-                      value={filters.categoryId}
-                      onChange={(e) =>
-                        setFilters((prev) => ({
-                          ...prev,
-                          categoryId: e.target.value,
-                        }))
-                      }
-                      className="h-11 w-full rounded-xl border border-gray-200 bg-[#FFFDFC] px-3 text-sm text-gray-700 outline-none transition focus:border-[#E8712E]"
-                    >
-                      <option value="all">Tất cả</option>
-                      {categories.map((c) => (
-                        <option
-                          key={c.dishCategoryId}
-                          value={String(c.dishCategoryId)}
-                        >
-                          {c.dishCategoryName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Trạng thái
-                    </label>
-                    <select
-                      value={filters.status}
-                      onChange={(e) =>
-                        setFilters((prev) => ({
-                          ...prev,
-                          status: e.target.value,
-                        }))
-                      }
-                      className="h-11 w-full rounded-xl border border-gray-200 bg-[#FFFDFC] px-3 text-sm text-gray-700 outline-none transition focus:border-[#E8712E]"
-                    >
-                      <option value="all">Tất cả</option>
-                      <option value="available">Đang bán</option>
-                      <option value="unavailable">Ngừng bán</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Giá từ
-                    </label>
-                    <input
-                      type="number"
-                      value={filters.priceMin}
-                      onChange={(e) =>
-                        setFilters((prev) => ({
-                          ...prev,
-                          priceMin: e.target.value,
-                        }))
-                      }
-                      placeholder="0"
-                      className="h-11 w-full rounded-xl border border-gray-200 bg-[#FFFDFC] px-3 text-sm text-gray-700 outline-none transition focus:border-[#E8712E]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Giá đến
-                    </label>
-                    <input
-                      type="number"
-                      value={filters.priceMax}
-                      onChange={(e) =>
-                        setFilters((prev) => ({
-                          ...prev,
-                          priceMax: e.target.value,
-                        }))
-                      }
-                      placeholder="1000000"
-                      className="h-11 w-full rounded-xl border border-gray-200 bg-[#FFFDFC] px-3 text-sm text-gray-700 outline-none transition focus:border-[#E8712E]"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-end gap-3 xl:pl-4">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setFilters({
-                        categoryId: "all",
-                        status: "all",
-                        priceMin: "",
-                        priceMax: "",
-                      })
-                    }
-                    className="h-11 rounded-xl border border-gray-200 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-                  >
-                    Đặt lại
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setOpenFilter(false)}
-                    className="h-11 rounded-xl bg-[#E8712E] px-5 text-sm font-semibold text-white transition hover:opacity-90"
-                  >
-                    Đóng
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
 
           <div className="w-full">
             <div className="relative">
@@ -891,13 +829,29 @@ export default function OwnerDish() {
                   onChange={(v) => setDishForm((p) => ({ ...p, dishName: v }))}
                   required
                 />
-                <Field
-                  label="Giá"
-                  type="number"
-                  value={dishForm.price}
-                  onChange={(v) => setDishForm((p) => ({ ...p, price: v }))}
-                  required
-                />
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Giá
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={formatVndInput(dishForm.price)}
+                      onChange={(e) =>
+                        setDishForm((p) => ({
+                          ...p,
+                          price: sanitizeMoneyInput(e.target.value),
+                        }))
+                      }
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-14 outline-none focus:border-[#E8712E]"
+                      required
+                    />
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+                      VNĐ
+                    </span>
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-end gap-3">
@@ -1089,15 +1043,29 @@ export default function OwnerDish() {
                         }
                         required
                       />
-                      <Field
-                        label="Giá"
-                        type="number"
-                        value={dishForm.price}
-                        onChange={(v) =>
-                          setDishForm((p) => ({ ...p, price: v }))
-                        }
-                        required
-                      />
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-gray-700">
+                          Giá
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={formatVndInput(dishForm.price)}
+                            onChange={(e) =>
+                              setDishForm((p) => ({
+                                ...p,
+                                price: sanitizeMoneyInput(e.target.value),
+                              }))
+                            }
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-14 outline-none focus:border-[#E8712E]"
+                            required
+                          />
+                          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+                            VNĐ
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1128,12 +1096,31 @@ export default function OwnerDish() {
                       </div>
 
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
-                          Trạng thái hiện tại
+                        <label className="mb-2 block text-sm font-medium text-gray-700">
+                          Trạng thái
                         </label>
-                        <div className="flex h-[42px] items-center rounded-lg border border-gray-300 bg-gray-50 px-3 text-sm text-gray-700">
-                          {renderDishStatusLabel(selectedDish.status)}
-                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDishForm((p) => ({
+                              ...p,
+                              status: String(p.status) === "1" ? "0" : "1",
+                            }))
+                          }
+                          className={`flex h-11 w-full items-center justify-between rounded-lg border px-4 text-sm font-semibold transition
+      ${
+        String(dishForm.status) === "1"
+          ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
+          : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+      }`}
+                        >
+                          <span className="text-xs">
+                            {String(dishForm.status) === "1"
+                              ? "Chuyển sang Ngừng bán"
+                              : "Chuyển sang Đang bán"}
+                          </span>
+                        </button>
                       </div>
                     </div>
 
@@ -1543,4 +1530,14 @@ function getImageUrl(img) {
   }
 
   return `${API_URL}${img}`;
+}
+
+function sanitizeMoneyInput(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function formatVndInput(value) {
+  const numeric = String(value || "").replace(/\D/g, "");
+  if (!numeric) return "";
+  return Number(numeric).toLocaleString("vi-VN");
 }

@@ -519,17 +519,20 @@ export default function OwnerPartyCategory() {
                       >
                         <td className="px-4 py-4 align-middle">
                           <div className="h-14 w-14 overflow-hidden rounded-2xl bg-white ring-1 ring-[#EEF2F7]">
-                            {normalizePartyImage(item.imageUrl) ? (
-                              <img
-                                src={normalizePartyImage(item.imageUrl)}
-                                alt={item.partyCategoryName}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center text-[#B6C2D5]">
-                                <ImageIcon className="h-5 w-5" />
-                              </div>
-                            )}
+                            <img
+                              src={
+                                normalizePartyImage(item.imageUrl) ||
+                                "/logo.png"
+                              }
+                              alt={item.partyCategoryName}
+                              className="h-full w-full object-cover"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = generateTextLogo(
+                                  item.partyCategoryName,
+                                );
+                              }}
+                            />
                           </div>
                         </td>
 
@@ -750,9 +753,15 @@ function PartyCategoryModal({
               </div>
               <div className="h-44 overflow-hidden rounded-2xl bg-white ring-1 ring-[#EEF2F7]">
                 <img
-                  src={displayImage}
+                  src={displayImage || "/logo.png"}
                   alt="preview"
                   className="h-full w-full object-cover"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = generateTextLogo(
+                      form.partyCategoryName || "Logo",
+                    );
+                  }}
                 />
               </div>
             </div>
@@ -821,4 +830,25 @@ function normalizePartyImage(imageUrl) {
   if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://"))
     return imageUrl;
   return `${API_URL}${imageUrl}`;
+}
+
+function generateTextLogo(name) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 100;
+  canvas.height = 100;
+  const ctx = canvas.getContext("2d");
+
+  // Background color
+  ctx.fillStyle = "#E8712E";
+  ctx.fillRect(0, 0, 100, 100);
+
+  // Text
+  ctx.fillStyle = "white";
+  ctx.font = "bold 50px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const initial = (name || "").charAt(0).toUpperCase() || "?";
+  ctx.fillText(initial, 50, 50);
+
+  return canvas.toDataURL();
 }

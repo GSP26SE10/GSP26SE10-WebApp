@@ -6,8 +6,6 @@ import API_URL from "@/config/api";
 import {
   Users,
   UserPlus,
-  Shield,
-  UserCog,
   Plus,
   Pencil,
   Trash2,
@@ -17,18 +15,19 @@ import {
   FolderKanban,
   Crown,
   UserRound,
-  Link2,
 } from "lucide-react";
 
 const EMPTY_USER_FORM = {
-  userName: "",
-  password: "",
-  fullName: "",
-  email: "",
-  address: "",
-  phone: "",
-  roleId: "",
-  status: "1",
+  UserName: "",
+  Password: "",
+  FullName: "",
+  Email: "",
+  Address: "",
+  Phone: "",
+  RoleId: "",
+  AvatarFile: null,
+  CurrentAvatarUrl: null,
+  removeAvatar: false,
 };
 
 const EMPTY_GROUP_FORM = {
@@ -37,13 +36,13 @@ const EMPTY_GROUP_FORM = {
   memberIds: [],
 };
 
-const EMPTY_MEMBER_FORM = {
-  staffGroupId: "",
-  staffId: "",
-};
-
 const TAB_ITEMS = [
   { key: "staff", label: "Nhân viên", icon: <Users className="h-4 w-4" /> },
+  {
+    key: "customers",
+    label: "Khách hàng",
+    icon: <UserRound className="h-4 w-4" />,
+  },
   {
     key: "groups",
     label: "Nhóm nhân viên",
@@ -75,6 +74,7 @@ export default function OwnerStaffManagement() {
 
   const [editingUserId, setEditingUserId] = React.useState(null);
   const [editingGroupId, setEditingGroupId] = React.useState(null);
+  const [originalGroupData, setOriginalGroupData] = React.useState(null);
 
   const [userForm, setUserForm] = React.useState(EMPTY_USER_FORM);
   const [groupForm, setGroupForm] = React.useState(EMPTY_GROUP_FORM);
@@ -100,8 +100,11 @@ export default function OwnerStaffManagement() {
     try {
       const res = await fetch(`${API_URL}/api/user`, { headers: authHeaders });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok)
+
+      if (!res.ok) {
         throw new Error(data?.message || "Không thể tải danh sách người dùng");
+      }
+
       setUsers(Array.isArray(data?.items) ? data.items : []);
     } catch (err) {
       toast.error(err.message || "Không thể tải danh sách người dùng");
@@ -115,8 +118,11 @@ export default function OwnerStaffManagement() {
     try {
       const res = await fetch(`${API_URL}/api/role`, { headers: authHeaders });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok)
+
+      if (!res.ok) {
         throw new Error(data?.message || "Không thể tải danh sách vai trò");
+      }
+
       setRoles(Array.isArray(data?.items) ? data.items : []);
     } catch (err) {
       toast.error(err.message || "Không thể tải danh sách vai trò");
@@ -132,8 +138,11 @@ export default function OwnerStaffManagement() {
         headers: authHeaders,
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok)
+
+      if (!res.ok) {
         throw new Error(data?.message || "Không thể tải danh sách nhóm");
+      }
+
       setGroups(Array.isArray(data?.items) ? data.items : []);
     } catch (err) {
       toast.error(err.message || "Không thể tải danh sách nhóm");
@@ -149,10 +158,13 @@ export default function OwnerStaffManagement() {
         headers: authHeaders,
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok)
+
+      if (!res.ok) {
         throw new Error(
           data?.message || "Không thể tải danh sách phân công nhóm",
         );
+      }
+
       setMembers(Array.isArray(data?.items) ? data.items : []);
     } catch (err) {
       toast.error(err.message || "Không thể tải danh sách phân công nhóm");
@@ -175,29 +187,50 @@ export default function OwnerStaffManagement() {
     }, {});
   }, [roles]);
 
+  const employeeUsers = React.useMemo(() => {
+    return users.filter((item) =>
+      ["GROUP_LEADER", "STAFF"].includes(
+        String(item.roleName || roleMap[item.roleId] || "").toUpperCase(),
+      ),
+    );
+  }, [users, roleMap]);
+
+  const customerUsers = React.useMemo(() => {
+    return users.filter(
+      (item) =>
+        String(item.roleName || roleMap[item.roleId] || "").toUpperCase() ===
+        "USER",
+    );
+  }, [users, roleMap]);
+
   const leaderCandidates = React.useMemo(
     () =>
       users.filter(
-        (item) => item.roleName === "GROUP_LEADER" || Number(item.roleId) === 2,
+        (item) =>
+          String(item.roleName || roleMap[item.roleId] || "").toUpperCase() ===
+          "GROUP_LEADER",
       ),
-    [users],
+    [users, roleMap],
   );
 
   const staffCandidates = React.useMemo(
     () =>
       users.filter(
-        (item) => item.roleName === "STAFF" || Number(item.roleId) === 3,
+        (item) =>
+          String(item.roleName || roleMap[item.roleId] || "").toUpperCase() ===
+          "STAFF",
       ),
-    [users],
+    [users, roleMap],
   );
 
-  const filteredUsers = React.useMemo(() => {
+  const filteredEmployees = React.useMemo(() => {
     const keyword = search.trim().toLowerCase();
-    if (!keyword) return users;
-    return users.filter((item) => {
+    if (!keyword) return employeeUsers;
+
+    return employeeUsers.filter((item) => {
       return (
         String(item.userId).includes(keyword) ||
-        String(item.userName || "")
+        String(item.userName || item.userName || "")
           .toLowerCase()
           .includes(keyword) ||
         String(item.fullName || "")
@@ -214,12 +247,43 @@ export default function OwnerStaffManagement() {
           .includes(keyword)
       );
     });
-  }, [users, search]);
+  }, [employeeUsers, search]);
+
+  const filteredCustomers = React.useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return customerUsers;
+
+    return customerUsers.filter((item) => {
+      return (
+        String(item.userId).includes(keyword) ||
+        String(item.userName || "")
+          .toLowerCase()
+          .includes(keyword) ||
+        String(item.fullName || "")
+          .toLowerCase()
+          .includes(keyword) ||
+        String(item.email || "")
+          .toLowerCase()
+          .includes(keyword) ||
+        String(item.phone || "")
+          .toLowerCase()
+          .includes(keyword)
+      );
+    });
+  }, [customerUsers, search]);
 
   const filteredGroups = React.useMemo(() => {
     const keyword = search.trim().toLowerCase();
-    if (!keyword) return groups;
-    return groups.filter((item) => {
+    const groupsWithMemberCount = groups.map((group) => ({
+      ...group,
+      memberCount: members.filter(
+        (m) => Number(m.staffGroupId) === Number(group.staffGroupId),
+      ).length,
+    }));
+
+    if (!keyword) return groupsWithMemberCount;
+
+    return groupsWithMemberCount.filter((item) => {
       return (
         String(item.staffGroupId).includes(keyword) ||
         String(item.staffGroupName || "")
@@ -230,23 +294,23 @@ export default function OwnerStaffManagement() {
           .includes(keyword)
       );
     });
-  }, [groups, search]);
+  }, [groups, members, search]);
 
   const stats = React.useMemo(
     () => [
       {
-        title: "Tổng người dùng",
-        value: users.length,
+        title: "Nhân viên",
+        value: employeeUsers.length,
         icon: <Users className="h-5 w-5" />,
         bg: "bg-blue-100",
         text: "text-blue-600",
       },
       {
-        title: "Group leader",
-        value: users.filter((item) => item.roleName === "GROUP_LEADER").length,
-        icon: <Crown className="h-5 w-5" />,
-        bg: "bg-amber-100",
-        text: "text-amber-600",
+        title: "Khách hàng",
+        value: customerUsers.length,
+        icon: <UserRound className="h-5 w-5" />,
+        bg: "bg-purple-100",
+        text: "text-purple-600",
       },
       {
         title: "Nhóm nhân viên",
@@ -256,7 +320,7 @@ export default function OwnerStaffManagement() {
         text: "text-emerald-600",
       },
     ],
-    [users, groups],
+    [employeeUsers, customerUsers, groups],
   );
 
   const resetUserForm = () => {
@@ -267,6 +331,7 @@ export default function OwnerStaffManagement() {
   const resetGroupForm = () => {
     setGroupForm(EMPTY_GROUP_FORM);
     setEditingGroupId(null);
+    setOriginalGroupData(null);
   };
 
   const openCreateUserModal = () => {
@@ -279,14 +344,16 @@ export default function OwnerStaffManagement() {
     setUserModalMode("edit");
     setEditingUserId(item.userId);
     setUserForm({
-      userName: item.userName || "",
-      password: "",
-      fullName: item.fullName || "",
-      email: item.email || "",
-      address: item.address || "",
-      phone: item.phone || "",
-      roleId: String(resolveRoleId(item, roles) || ""),
-      status: String(item.status ?? 1),
+      UserName: item.userName || "",
+      Password: "",
+      FullName: item.fullName || "",
+      Email: item.email || "",
+      Address: item.address || "",
+      Phone: item.phone || "",
+      RoleId: String(resolveRoleId(item, roles) || ""),
+      AvatarFile: null,
+      CurrentAvatarUrl: item.avatar || item.avatarUrl || null,
+      removeAvatar: false,
     });
     setUserModalOpen(true);
   };
@@ -300,15 +367,19 @@ export default function OwnerStaffManagement() {
   const openEditGroupModal = (item) => {
     setGroupModalMode("edit");
     setEditingGroupId(item.staffGroupId);
+
     const groupMembers = members
       .filter((m) => Number(m.staffGroupId) === Number(item.staffGroupId))
       .map((m) => String(m.staffId));
 
-    setGroupForm({
+    const groupData = {
       staffGroupName: item.staffGroupName || "",
       leaderId: String(item.leaderId || ""),
       memberIds: groupMembers,
-    });
+    };
+
+    setGroupForm(groupData);
+    setOriginalGroupData(groupData);
     setGroupModalOpen(true);
   };
 
@@ -323,16 +394,15 @@ export default function OwnerStaffManagement() {
   };
 
   const validateUserForm = () => {
-    if (!userForm.userName.trim()) return "Vui lòng nhập username.";
-    if (userModalMode === "create" && !userForm.password.trim())
+    if (!userForm.UserName.trim()) return "Vui lòng nhập username.";
+    if (userModalMode === "create" && !userForm.Password.trim()) {
       return "Vui lòng nhập mật khẩu.";
-    if (!userForm.fullName.trim()) return "Vui lòng nhập họ tên.";
-    if (!userForm.email.trim()) return "Vui lòng nhập email.";
-    if (!userForm.address.trim()) return "Vui lòng nhập địa chỉ.";
-    if (!userForm.phone.trim()) return "Vui lòng nhập số điện thoại.";
-    if (!userForm.roleId) return "Vui lòng chọn vai trò.";
-    if (userForm.status !== "0" && userForm.status !== "1")
-      return "Vui lòng chọn trạng thái người dùng.";
+    }
+    if (!userForm.FullName.trim()) return "Vui lòng nhập họ tên.";
+    if (!userForm.Email.trim()) return "Vui lòng nhập email.";
+    if (!userForm.Address.trim()) return "Vui lòng nhập địa chỉ.";
+    if (!userForm.Phone.trim()) return "Vui lòng nhập số điện thoại.";
+    if (!userForm.RoleId) return "Vui lòng chọn vai trò.";
     return "";
   };
 
@@ -342,8 +412,33 @@ export default function OwnerStaffManagement() {
     return "";
   };
 
+  const buildUserFormData = () => {
+    const formData = new FormData();
+
+    formData.append("UserName", userForm.UserName.trim());
+    if (userForm.Password.trim()) {
+      formData.append("Password", userForm.Password.trim());
+    }
+    formData.append("FullName", userForm.FullName.trim());
+    formData.append("Email", userForm.Email.trim());
+    formData.append("Address", userForm.Address.trim());
+    formData.append("Phone", userForm.Phone.trim());
+    formData.append("RoleId", String(Number(userForm.RoleId)));
+
+    if (userForm.AvatarFile instanceof File) {
+      formData.append("AvatarFile", userForm.AvatarFile);
+    }
+
+    if (userForm.removeAvatar) {
+      formData.append("RemoveAvatar", "true");
+    }
+
+    return formData;
+  };
+
   const handleSubmitUser = async (e) => {
     e.preventDefault();
+
     const validationError = validateUserForm();
     if (validationError) {
       toast.error(validationError);
@@ -351,6 +446,7 @@ export default function OwnerStaffManagement() {
     }
 
     setSubmittingUser(true);
+
     try {
       const url =
         userModalMode === "create"
@@ -359,43 +455,33 @@ export default function OwnerStaffManagement() {
 
       const method = userModalMode === "create" ? "POST" : "PUT";
 
-      const payload = {
-        userName: userForm.userName.trim(),
-        ...(userForm.password.trim()
-          ? { password: userForm.password.trim() }
-          : {}),
-        fullName: userForm.fullName.trim(),
-        email: userForm.email.trim(),
-        address: userForm.address.trim(),
-        phone: userForm.phone.trim(),
-        roleId: Number(userForm.roleId),
-        status: Number(userForm.status),
-      };
+      const formData = buildUserFormData();
 
       const res = await fetch(url, {
         method,
         headers: {
           ...authHeaders,
-          "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: formData,
       });
 
       const data = await res.json().catch(() => ({}));
+
       if (!res.ok) {
         throw new Error(
           data?.message ||
             (userModalMode === "create"
               ? "Tạo nhân viên thất bại"
-              : "Cập nhật nhân viên thất bại"),
+              : "Cập nhật tài khoản thất bại"),
         );
       }
 
       toast.success(
         userModalMode === "create"
-          ? "Tạo nhân viên thành công"
-          : "Cập nhật nhân viên thành công",
+          ? "Tạo tài khoản thành công"
+          : "Cập nhật tài khoản thành công",
       );
+
       closeUserModal();
       await fetchUsers();
     } catch (err) {
@@ -407,6 +493,7 @@ export default function OwnerStaffManagement() {
 
   const handleSubmitGroup = async (e) => {
     e.preventDefault();
+
     const validationError = validateGroupForm();
     if (validationError) {
       toast.error(validationError);
@@ -414,64 +501,76 @@ export default function OwnerStaffManagement() {
     }
 
     setSubmittingGroup(true);
+
     try {
-      const url =
-        groupModalMode === "create"
-          ? `${API_URL}/api/staff-group`
-          : `${API_URL}/api/staff-group/${editingGroupId}`;
+      const isLeaderChanged =
+        groupModalMode === "create" ||
+        originalGroupData?.leaderId !== groupForm.leaderId;
 
-      const method = groupModalMode === "create" ? "POST" : "PUT";
+      let groupId = Number(editingGroupId);
 
-      const payload = {
-        staffGroupName: groupForm.staffGroupName.trim(),
-        leaderId: Number(groupForm.leaderId),
-      };
+      if (groupModalMode === "create" || isLeaderChanged) {
+        const url =
+          groupModalMode === "create"
+            ? `${API_URL}/api/staff-group`
+            : `${API_URL}/api/staff-group/${editingGroupId}`;
 
-      const res = await fetch(url, {
-        method,
-        headers: {
-          ...authHeaders,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+        const method = groupModalMode === "create" ? "POST" : "PUT";
 
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(
-          data?.message ||
-            (groupModalMode === "create"
-              ? "Tạo nhóm thất bại"
-              : "Cập nhật nhóm thất bại"),
-        );
+        const payload = {
+          staffGroupName: groupForm.staffGroupName.trim(),
+          leaderId: Number(groupForm.leaderId),
+        };
+
+        const res = await fetch(url, {
+          method,
+          headers: {
+            ...authHeaders,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          throw new Error(
+            data?.message ||
+              (groupModalMode === "create"
+                ? "Tạo nhóm thất bại"
+                : "Cập nhật nhóm thất bại"),
+          );
+        }
+
+        if (groupModalMode === "create") {
+          groupId = Number(data?.staffGroupId || data?.item?.staffGroupId || 0);
+          toast.success("Tạo nhóm nhân viên thành công");
+        } else {
+          toast.success("Cập nhật nhóm nhân viên thành công");
+        }
+      } else {
+        if (groupModalMode === "edit") {
+          toast.success("Cập nhật nhóm nhân viên thành công");
+        }
       }
-
-      toast.success(
-        groupModalMode === "create"
-          ? "Tạo nhóm nhân viên thành công"
-          : "Cập nhật nhóm nhân viên thành công",
-      );
-
-      const groupId =
-        groupModalMode === "create"
-          ? Number(data?.staffGroupId || data?.item?.staffGroupId || 0)
-          : Number(editingGroupId);
 
       if (!groupId) {
         throw new Error("Không xác định được ID nhóm sau khi lưu");
       }
 
-      const exMembers = members.filter(
+      const existingMembers = members.filter(
         (m) => Number(m.staffGroupId) === Number(groupId),
       );
+
       const selectedIds = Array.isArray(groupForm.memberIds)
         ? groupForm.memberIds.map((id) => Number(id))
         : [];
 
       const addIds = selectedIds.filter(
-        (id) => !exMembers.some((m) => Number(m.staffId) === id),
+        (id) => !existingMembers.some((m) => Number(m.staffId) === id),
       );
-      const removeMembers = exMembers.filter(
+
+      const removeMembers = existingMembers.filter(
         (m) => !selectedIds.includes(Number(m.staffId)),
       );
 
@@ -523,28 +622,29 @@ export default function OwnerStaffManagement() {
     setDeletingKey(`user-${item.userId}`);
 
     try {
-      const payload = {
-        status: isActive ? 0 : 1,
-      };
-
       const res = await fetch(`${API_URL}/api/user/${item.userId}`, {
         method: "PUT",
         headers: {
           ...authHeaders,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          status: isActive ? 0 : 1,
+        }),
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok)
+
+      if (!res.ok) {
         throw new Error(
           data?.message || "Cập nhật trạng thái người dùng thất bại",
         );
+      }
 
       toast.success(
         isActive ? "Người dùng đã bị khóa" : "Người dùng đã được mở khóa",
       );
+
       await fetchUsers();
     } catch (err) {
       toast.error(err.message || "Cập nhật trạng thái người dùng thất bại");
@@ -554,10 +654,11 @@ export default function OwnerStaffManagement() {
   };
 
   const handleDelete = async ({ type, id, name }) => {
-    const confirmed = window.confirm(`Bạn có chắc muốn xóa \"${name}\" không?`);
+    const confirmed = window.confirm(`Bạn có chắc muốn xóa "${name}" không?`);
     if (!confirmed) return;
 
     setDeletingKey(`${type}-${id}`);
+
     try {
       const endpointMap = {
         user: `${API_URL}/api/user/${id}`,
@@ -570,10 +671,17 @@ export default function OwnerStaffManagement() {
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.message || "Xóa thất bại");
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Xóa thất bại");
+      }
 
       toast.success("Xóa thành công");
-      if (type === "user") await fetchUsers();
+
+      if (type === "user") {
+        await fetchUsers();
+      }
+
       if (type === "group") {
         await fetchGroups();
         await fetchMembers();
@@ -590,24 +698,26 @@ export default function OwnerStaffManagement() {
       <Sidebar onExpandChange={setSbExpanded} />
 
       <div
-        className={`min-h-screen transition-[margin] duration-300 ease-in-out ${sbExpanded ? "ml-72" : "ml-20"}`}
+        className={`min-h-screen transition-[margin] duration-300 ease-in-out ${
+          sbExpanded ? "ml-72" : "ml-20"
+        }`}
       >
         <Topbar
           breadcrumb={
             <>
               <span className="text-gray-400">QUẢN LÝ</span>
               <span className="text-gray-400 mx-2">/</span>
-              <span className="text-[#2F3A67] font-bold">NHÂN VIÊN</span>
+              <span className="text-[#2F3A67] font-bold">NHÂN SỰ</span>
             </>
           }
           showSearch
           searchValue={search}
           onSearchChange={setSearch}
-          searchPlaceholder="Tìm nhân viên, nhóm, phân công"
+          searchPlaceholder="Tìm "
         />
 
         <main className="px-7 py-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {stats.map((item) => (
               <div
                 key={item.title}
@@ -630,27 +740,31 @@ export default function OwnerStaffManagement() {
 
           <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
             <h1 className="text-[20px] font-bold text-[#E54B2D]">
-              Quản lý nhân viên và nhóm
+              Quản lý nhân viên, khách hàng và nhóm
             </h1>
 
             <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={openCreateUserModal}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#2F3A67] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
-              >
-                <UserPlus className="h-4 w-4" />
-                Tạo nhân viên
-              </button>
+              {activeTab === "staff" ? (
+                <button
+                  type="button"
+                  onClick={openCreateUserModal}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#2F3A67] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Tạo nhân viên
+                </button>
+              ) : null}
 
-              <button
-                type="button"
-                onClick={openCreateGroupModal}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#2563EB] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
-              >
-                <Plus className="h-4 w-4" />
-                Tạo nhóm
-              </button>
+              {activeTab === "groups" ? (
+                <button
+                  type="button"
+                  onClick={openCreateGroupModal}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#2563EB] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+                >
+                  <Plus className="h-4 w-4" />
+                  Tạo nhóm
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -681,16 +795,16 @@ export default function OwnerStaffManagement() {
                 <h2 className="text-[24px] font-bold text-[#2F3A67]">
                   {activeTab === "staff"
                     ? "Danh sách nhân viên"
-                    : activeTab === "groups"
-                      ? "Danh sách nhóm nhân viên"
-                      : "Danh sách phân công nhóm"}
+                    : activeTab === "customers"
+                      ? "Danh sách khách hàng"
+                      : "Danh sách nhóm nhân viên"}
                 </h2>
                 <div className="mt-1 text-sm text-[#8DA1C1]">
                   {activeTab === "staff"
-                    ? "Tạo nhân viên, gán vai trò admin, group leader, staff, user."
-                    : activeTab === "groups"
-                      ? "Tạo nhóm nhân viên và phân công group leader quản lý nhóm."
-                      : "Gán staff vào từng nhóm nhân viên."}
+                    ? "Quản lý tài khoản group leader và staff."
+                    : activeTab === "customers"
+                      ? "Theo dõi và quản lý danh sách khách hàng trong hệ thống."
+                      : "Tạo nhóm nhân viên và phân công group leader quản lý nhóm."}
                 </div>
               </div>
 
@@ -702,9 +816,27 @@ export default function OwnerStaffManagement() {
 
             {activeTab === "staff" ? (
               <UserTable
-                items={filteredUsers}
+                items={filteredEmployees}
                 loading={loadingUsers || loadingRoles}
                 roleMap={roleMap}
+                deletingKey={deletingKey}
+                onEdit={openEditUserModal}
+                onDelete={(item) =>
+                  handleDelete({
+                    type: "user",
+                    id: item.userId,
+                    name:
+                      item.fullName || item.userName || `User #${item.userId}`,
+                  })
+                }
+                onToggleStatus={handleToggleUserStatus}
+              />
+            ) : null}
+
+            {activeTab === "customers" ? (
+              <CustomerTable
+                items={filteredCustomers}
+                loading={loadingUsers}
                 deletingKey={deletingKey}
                 onEdit={openEditUserModal}
                 onDelete={(item) =>
@@ -722,7 +854,7 @@ export default function OwnerStaffManagement() {
             {activeTab === "groups" ? (
               <GroupTable
                 items={filteredGroups}
-                loading={loadingGroups}
+                loading={loadingGroups || loadingMembers}
                 deletingKey={deletingKey}
                 onEdit={openEditGroupModal}
                 onDelete={(item) =>
@@ -741,39 +873,113 @@ export default function OwnerStaffManagement() {
       {userModalOpen ? (
         <ModalShell
           title={
-            userModalMode === "create" ? "Tạo nhân viên" : "Cập nhật nhân viên"
+            userModalMode === "create" ? "Tạo nhân viên" : "Cập nhật tài khoản"
           }
-          description="Quản lý tài khoản nhân viên, group leader hoặc user."
           onClose={closeUserModal}
         >
           <form onSubmit={handleSubmitUser} className="space-y-5">
+            <FormField label="Ảnh đại diện">
+              <div className="space-y-3">
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      setUserForm((prev) => ({
+                        ...prev,
+                        AvatarFile: file,
+                        removeAvatar: false,
+                      }));
+                    }}
+                    className="hidden"
+                    id="avatarFileInput"
+                  />
+                  <label
+                    htmlFor="avatarFileInput"
+                    className="inline-flex items-center gap-2 rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm font-medium text-[#2F3A67] cursor-pointer hover:bg-[#F7F9FC]"
+                  >
+                    {userForm.AvatarFile
+                      ? `✓ ${userForm.AvatarFile.name}`
+                      : "Chọn ảnh"}
+                  </label>
+                </div>
+                <div className="flex flex-col items-center">
+                  {userForm.AvatarFile ? (
+                    <div className="rounded-xl border border-[#DCE6F7] bg-[#F7F9FC] p-6">
+                      <p className="mb-4 text-xs font-medium text-center text-[#2F3A67]">
+                        Xem trước ảnh mới:
+                      </p>
+                      <img
+                        src={URL.createObjectURL(userForm.AvatarFile)}
+                        alt="Preview"
+                        className="w-32 h-32 rounded-full border-4 border-[#2F3A67] object-cover"
+                      />
+                    </div>
+                  ) : userForm.CurrentAvatarUrl ? (
+                    <div className="relative rounded-xl border border-[#DCE6F7] bg-[#F7F9FC] p-6">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setUserForm((prev) => ({
+                            ...prev,
+                            AvatarFile: null,
+                            CurrentAvatarUrl: null,
+                            removeAvatar: true,
+                          }))
+                        }
+                        className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#F87171] text-white hover:bg-[#EF4444]"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                      <p className="mb-4 text-xs font-medium text-center text-[#2F3A67]">
+                        Ảnh hiện tại:
+                      </p>
+                      <img
+                        src={
+                          userForm.CurrentAvatarUrl.startsWith("http")
+                            ? userForm.CurrentAvatarUrl
+                            : `${API_URL}${userForm.CurrentAvatarUrl}`
+                        }
+                        alt="Current Avatar"
+                        className="w-32 h-32 rounded-full border-4 border-[#8DA1C1] object-cover"
+                      />
+                    </div>
+                  ) : null}
+                </div>
+                <p className="text-xs text-[#8DA1C1] text-center">
+                  Để trống nếu không muốn chọn ảnh.
+                </p>
+              </div>
+            </FormField>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <FormField label="Username" required>
+              <FormField label="UserName" required>
                 <input
                   type="text"
-                  value={userForm.userName}
+                  value={userForm.UserName}
                   onChange={(e) =>
                     setUserForm((prev) => ({
                       ...prev,
-                      userName: e.target.value,
+                      UserName: e.target.value,
                     }))
                   }
                   className={inputClass}
-                  placeholder="admin"
+                  placeholder="staff01"
                 />
               </FormField>
 
               <FormField
-                label={userModalMode === "create" ? "Mật khẩu" : "Mật khẩu mới"}
+                label={userModalMode === "create" ? "Password" : "Password mới"}
                 required={userModalMode === "create"}
               >
                 <input
                   type="password"
-                  value={userForm.password}
+                  value={userForm.Password}
                   onChange={(e) =>
                     setUserForm((prev) => ({
                       ...prev,
-                      password: e.target.value,
+                      Password: e.target.value,
                     }))
                   }
                   className={inputClass}
@@ -787,88 +993,97 @@ export default function OwnerStaffManagement() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <FormField label="Họ tên" required>
+              <FormField label="FullName" required>
                 <input
                   type="text"
-                  value={userForm.fullName}
+                  value={userForm.FullName}
                   onChange={(e) =>
                     setUserForm((prev) => ({
                       ...prev,
-                      fullName: e.target.value,
+                      FullName: e.target.value,
                     }))
                   }
                   className={inputClass}
-                  placeholder="Team Leader Nguyen"
+                  placeholder="Nguyen Van A"
                 />
               </FormField>
 
               <FormField label="Email" required>
                 <input
                   type="email"
-                  value={userForm.email}
+                  value={userForm.Email}
                   onChange={(e) =>
-                    setUserForm((prev) => ({ ...prev, email: e.target.value }))
+                    setUserForm((prev) => ({
+                      ...prev,
+                      Email: e.target.value,
+                    }))
                   }
                   className={inputClass}
-                  placeholder="leader@buffet.vn"
+                  placeholder="staff@buffet.vn"
                 />
               </FormField>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <FormField label="Số điện thoại" required>
+              <FormField label="Phone" required>
                 <input
                   type="text"
-                  value={userForm.phone}
+                  value={userForm.Phone}
                   onChange={(e) =>
-                    setUserForm((prev) => ({ ...prev, phone: e.target.value }))
+                    setUserForm((prev) => ({
+                      ...prev,
+                      Phone: e.target.value,
+                    }))
                   }
                   className={inputClass}
-                  placeholder="0901234567"
+                  placeholder="0908854016"
                 />
               </FormField>
 
-              <FormField label="Vai trò" required>
+              <FormField label="RoleId" required>
                 <select
-                  value={userForm.roleId}
+                  value={userForm.RoleId}
                   onChange={(e) =>
-                    setUserForm((prev) => ({ ...prev, roleId: e.target.value }))
+                    setUserForm((prev) => ({
+                      ...prev,
+                      RoleId: e.target.value,
+                    }))
                   }
                   className={inputClass}
-                  disabled={userModalMode === "edit"}
+                  disabled={
+                    userModalMode === "edit" &&
+                    String(roleMap[userForm.RoleId] || "").toUpperCase() ===
+                      "USER"
+                  }
                 >
                   <option value="">Chọn vai trò</option>
-                  {roles.map((item) => (
-                    <option key={item.roleId} value={item.roleId}>
-                      {item.roleName}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-
-              <FormField label="Trạng thái" required>
-                <select
-                  value={userForm.status}
-                  onChange={(e) =>
-                    setUserForm((prev) => ({ ...prev, status: e.target.value }))
-                  }
-                  className={inputClass}
-                >
-                  <option value="1">Hoạt động</option>
-                  <option value="0">Bị cấm</option>
+                  {roles
+                    .filter((item) =>
+                      ["GROUP_LEADER", "STAFF"].includes(
+                        String(item.roleName || "").toUpperCase(),
+                      ),
+                    )
+                    .map((item) => (
+                      <option key={item.roleId} value={item.roleId}>
+                        {item.roleName}
+                      </option>
+                    ))}
                 </select>
               </FormField>
             </div>
 
-            <FormField label="Địa chỉ" required>
+            <FormField label="Address" required>
               <input
                 type="text"
-                value={userForm.address}
+                value={userForm.Address}
                 onChange={(e) =>
-                  setUserForm((prev) => ({ ...prev, address: e.target.value }))
+                  setUserForm((prev) => ({
+                    ...prev,
+                    Address: e.target.value,
+                  }))
                 }
                 className={inputClass}
-                placeholder="123 Admin St"
+                placeholder="123 Nguyen Trai"
               />
             </FormField>
 
@@ -890,7 +1105,7 @@ export default function OwnerStaffManagement() {
               ? "Tạo nhóm nhân viên"
               : "Cập nhật nhóm nhân viên"
           }
-          description="Chọn group leader phụ trách nhóm ngay khi tạo nhóm."
+          description="Chọn group leader và các staff thuộc nhóm."
           onClose={closeGroupModal}
         >
           <form onSubmit={handleSubmitGroup} className="space-y-5">
@@ -929,30 +1144,95 @@ export default function OwnerStaffManagement() {
               </select>
             </FormField>
 
-            <FormField label="Thành viên nhóm" required={false}>
-              <select
-                multiple
-                value={groupForm.memberIds}
-                onChange={(e) => {
-                  const selected = Array.from(e.target.selectedOptions).map(
-                    (opt) => opt.value,
-                  );
-                  setGroupForm((prev) => ({
-                    ...prev,
-                    memberIds: selected,
-                  }));
-                }}
-                className={inputClass + " h-40"}
-              >
-                {staffCandidates.map((item) => (
-                  <option key={item.userId} value={item.userId}>
-                    {item.fullName} - {item.email}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-1 text-xs text-[#8DA1C1]">
-                Chọn nhiều nhân viên bằng Ctrl/Cmd + click.
-              </p>
+            <FormField label="Thành viên nhóm">
+              <div className="space-y-2 max-h-64 overflow-y-auto border border-[#DCE6F7] rounded-xl p-4 bg-white">
+                {staffCandidates.length === 0 ? (
+                  <p className="text-sm text-[#8DA1C1]">
+                    Không có nhân viên khả dụng.
+                  </p>
+                ) : (
+                  staffCandidates.map((item) => {
+                    const isSelected = groupForm.memberIds.includes(
+                      String(item.userId),
+                    );
+                    return (
+                      <label
+                        key={item.userId}
+                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-[#F7F9FC] cursor-pointer transition"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setGroupForm((prev) => ({
+                                ...prev,
+                                memberIds: [
+                                  ...prev.memberIds,
+                                  String(item.userId),
+                                ],
+                              }));
+                            } else {
+                              setGroupForm((prev) => ({
+                                ...prev,
+                                memberIds: prev.memberIds.filter(
+                                  (id) => id !== String(item.userId),
+                                ),
+                              }));
+                            }
+                          }}
+                          className="w-4 h-4 rounded border-[#DCE6F7] accent-[#2F3A67]"
+                        />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-[#2F3A67]">
+                            {item.fullName}
+                          </div>
+                          <div className="text-xs text-[#8DA1C1]">
+                            {item.email}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+
+              {groupForm.memberIds.length > 0 && (
+                <div className="mt-4 p-4 bg-[#F7F9FC] rounded-xl border border-[#DCE6F7]">
+                  <div className="text-sm font-medium text-[#2F3A67] mb-2">
+                    Đã chọn ({groupForm.memberIds.length}):
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {groupForm.memberIds.map((memberId) => {
+                      const member = staffCandidates.find(
+                        (u) => String(u.userId) === String(memberId),
+                      );
+                      return member ? (
+                        <span
+                          key={memberId}
+                          className="inline-flex items-center gap-2 rounded-lg bg-[#2F3A67] px-3 py-1 text-xs font-medium text-white"
+                        >
+                          {member.fullName}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGroupForm((prev) => ({
+                                ...prev,
+                                memberIds: prev.memberIds.filter(
+                                  (id) => id !== memberId,
+                                ),
+                              }));
+                            }}
+                            className="hover:opacity-70"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              )}
             </FormField>
 
             <ModalActions
@@ -1010,9 +1290,10 @@ function UserTable({
                   {item.fullName || "--"}
                 </div>
                 <div className="mt-1 text-xs text-[#8DA1C1]">
-                  {item.userName}
+                  {item.userName || "--"}
                 </div>
               </BodyCell>
+
               <BodyCell>
                 <div className="text-sm text-[#42526B]">
                   {item.email || "--"}
@@ -1021,19 +1302,102 @@ function UserTable({
                   {item.phone || "--"}
                 </div>
               </BodyCell>
+
               <BodyCell>
                 <RolePill
                   label={item.roleName || roleMap[item.roleId] || "--"}
                 />
               </BodyCell>
+
               <BodyCell>
                 <div className="max-w-[260px] text-sm leading-6 text-[#42526B] line-clamp-2">
                   {item.address || "--"}
                 </div>
               </BodyCell>
+
               <BodyCell>
                 <StatusPill active={Number(item.status) === 1} />
               </BodyCell>
+
+              <BodyCell>
+                <ActionButtons
+                  deleting={deletingKey === `user-${item.userId}`}
+                  onEdit={() => onEdit(item)}
+                  onDelete={() => onDelete(item)}
+                  onToggleStatus={onToggleStatus}
+                  item={item}
+                />
+              </BodyCell>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function CustomerTable({
+  items,
+  loading,
+  deletingKey,
+  onEdit,
+  onDelete,
+  onToggleStatus,
+}) {
+  if (loading) {
+    return <EmptyState text="Đang tải danh sách khách hàng..." />;
+  }
+
+  if (items.length === 0) {
+    return <EmptyState text="Không có khách hàng phù hợp." />;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full border-separate border-spacing-y-3">
+        <thead>
+          <tr>
+            <HeaderCell>Khách hàng</HeaderCell>
+            <HeaderCell>Liên hệ</HeaderCell>
+            <HeaderCell>Địa chỉ</HeaderCell>
+            <HeaderCell>Trạng thái</HeaderCell>
+            <HeaderCell>Thao tác</HeaderCell>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <tr
+              key={item.userId}
+              className="overflow-hidden rounded-2xl bg-[#FAFBFD]"
+            >
+              <BodyCell>
+                <div className="font-semibold text-[#2F3A67]">
+                  {item.fullName || "--"}
+                </div>
+                <div className="mt-1 text-xs text-[#8DA1C1]">
+                  {item.userName || "--"}
+                </div>
+              </BodyCell>
+
+              <BodyCell>
+                <div className="text-sm text-[#42526B]">
+                  {item.email || "--"}
+                </div>
+                <div className="mt-1 text-xs text-[#8DA1C1]">
+                  {item.phone || "--"}
+                </div>
+              </BodyCell>
+
+              <BodyCell>
+                <div className="max-w-[260px] text-sm leading-6 text-[#42526B] line-clamp-2">
+                  {item.address || "--"}
+                </div>
+              </BodyCell>
+
+              <BodyCell>
+                <StatusPill active={Number(item.status) === 1} />
+              </BodyCell>
+
               <BodyCell>
                 <ActionButtons
                   deleting={deletingKey === `user-${item.userId}`}
@@ -1052,9 +1416,13 @@ function UserTable({
 }
 
 function GroupTable({ items, loading, deletingKey, onEdit, onDelete }) {
-  if (loading) return <EmptyState text="Đang tải danh sách nhóm..." />;
-  if (items.length === 0)
+  if (loading) {
+    return <EmptyState text="Đang tải danh sách nhóm..." />;
+  }
+
+  if (items.length === 0) {
     return <EmptyState text="Không có nhóm nhân viên phù hợp." />;
+  }
 
   return (
     <div className="overflow-x-auto">
@@ -1063,6 +1431,7 @@ function GroupTable({ items, loading, deletingKey, onEdit, onDelete }) {
           <tr>
             <HeaderCell>Tên nhóm</HeaderCell>
             <HeaderCell>Group leader</HeaderCell>
+            <HeaderCell>Thành viên</HeaderCell>
             <HeaderCell>Trạng thái</HeaderCell>
             <HeaderCell>Thao tác</HeaderCell>
           </tr>
@@ -1075,77 +1444,33 @@ function GroupTable({ items, loading, deletingKey, onEdit, onDelete }) {
             >
               <BodyCell>
                 <div className="font-semibold text-[#2F3A67]">
-                  {item.staffGroupName}
+                  {item.staffGroupName || "--"}
                 </div>
                 <div className="mt-1 text-xs text-[#8DA1C1]">
                   Nhóm #{item.staffGroupId}
                 </div>
               </BodyCell>
+
               <BodyCell>
                 <div className="inline-flex items-center gap-2 rounded-xl bg-[#FFF8E8] px-3 py-2 text-sm font-medium text-[#A16207]">
                   <Crown className="h-4 w-4" />
                   {item.leaderName || "--"}
                 </div>
               </BodyCell>
+
+              <BodyCell>
+                <div className="text-sm text-[#42526B]">
+                  {item.memberCount || 0} nhân viên
+                </div>
+              </BodyCell>
+
               <BodyCell>
                 <StatusPill active={Number(item.status) === 1} />
               </BodyCell>
+
               <BodyCell>
                 <ActionButtons
                   deleting={deletingKey === `group-${item.staffGroupId}`}
-                  onEdit={() => onEdit(item)}
-                  onDelete={() => onDelete(item)}
-                />
-              </BodyCell>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function MemberTable({ items, loading, deletingKey, onEdit, onDelete }) {
-  if (loading)
-    return <EmptyState text="Đang tải danh sách phân công nhóm..." />;
-  if (items.length === 0)
-    return <EmptyState text="Không có dữ liệu phân công nhóm." />;
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full border-separate border-spacing-y-3">
-        <thead>
-          <tr>
-            <HeaderCell>Nhân viên</HeaderCell>
-            <HeaderCell>Nhóm</HeaderCell>
-            <HeaderCell>Trạng thái</HeaderCell>
-            <HeaderCell>Thao tác</HeaderCell>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr
-              key={item.staffGroupMemberId}
-              className="overflow-hidden rounded-2xl bg-[#FAFBFD]"
-            >
-              <BodyCell>
-                <div className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 ring-1 ring-[#EEF2F7] text-sm font-medium text-[#2F3A67]">
-                  <UserRound className="h-4 w-4" />
-                  {item.staffName || "--"}
-                </div>
-              </BodyCell>
-              <BodyCell>
-                <div className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 ring-1 ring-[#EEF2F7] text-sm font-medium text-[#2F3A67]">
-                  <FolderKanban className="h-4 w-4" />
-                  {item.staffGroupName || "--"}
-                </div>
-              </BodyCell>
-              <BodyCell>
-                <StatusPill active={Number(item.status) === 1} />
-              </BodyCell>
-              <BodyCell>
-                <ActionButtons
-                  deleting={deletingKey === `member-${item.staffGroupMemberId}`}
                   onEdit={() => onEdit(item)}
                   onDelete={() => onDelete(item)}
                 />
@@ -1238,7 +1563,9 @@ function RolePill({ label }) {
 
   return (
     <span
-      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${colorMap[label] || "bg-[#F3F4F6] text-[#374151]"}`}
+      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+        colorMap[label] || "bg-[#F3F4F6] text-[#374151]"
+      }`}
     >
       {label}
     </span>
@@ -1248,7 +1575,9 @@ function RolePill({ label }) {
 function StatusPill({ active }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${active ? "bg-[#DCFCE7] text-[#15803D]" : "bg-[#F3F4F6] text-[#6B7280]"}`}
+      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+        active ? "bg-[#DCFCE7] text-[#15803D]" : "bg-[#F3F4F6] text-[#6B7280]"
+      }`}
     >
       {active ? "Đang hoạt động" : "Ngừng hoạt động"}
     </span>
@@ -1258,14 +1587,16 @@ function StatusPill({ active }) {
 function ActionButtons({ deleting, onEdit, onDelete, onToggleStatus, item }) {
   return (
     <div className="flex items-center gap-2">
-      <button
-        type="button"
-        onClick={onEdit}
-        className="inline-flex items-center gap-2 rounded-xl border border-[#D6DFEF] bg-white px-3 py-2 text-sm font-medium text-[#2F3A67] hover:bg-[#F7F9FC]"
-      >
-        <Pencil className="h-4 w-4" />
-        Sửa
-      </button>
+      {onEdit ? (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="inline-flex items-center gap-2 rounded-xl border border-[#D6DFEF] bg-white px-3 py-2 text-sm font-medium text-[#2F3A67] hover:bg-[#F7F9FC]"
+        >
+          <Pencil className="h-4 w-4" />
+          Sửa
+        </button>
+      ) : null}
 
       <button
         type="button"
@@ -1277,7 +1608,7 @@ function ActionButtons({ deleting, onEdit, onDelete, onToggleStatus, item }) {
         {deleting ? "Đang xóa..." : "Xóa"}
       </button>
 
-      {onToggleStatus && (
+      {onToggleStatus && item ? (
         <button
           type="button"
           onClick={() => onToggleStatus(item)}
@@ -1285,7 +1616,7 @@ function ActionButtons({ deleting, onEdit, onDelete, onToggleStatus, item }) {
         >
           {Number(item.status) === 1 ? "Khóa" : "Mở khóa"}
         </button>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -1306,3 +1637,6 @@ function resolveRoleId(user, roles) {
 
 const inputClass =
   "w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]";
+
+const fileInputClass =
+  "w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none file:mr-4 file:rounded-lg file:border-0 file:bg-[#EEF2FF] file:px-3 file:py-2 file:text-sm file:font-medium file:text-[#2F3A67]";

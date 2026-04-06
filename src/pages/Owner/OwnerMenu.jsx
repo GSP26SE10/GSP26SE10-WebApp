@@ -46,8 +46,8 @@ export default function OwnerMenu() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
 
-  const [openFilter, setOpenFilter] = React.useState(false);
   const [filters, setFilters] = React.useState({
+    categoryId: "all",
     status: "all",
     priceMin: "",
     priceMax: "",
@@ -62,6 +62,7 @@ export default function OwnerMenu() {
   const [submitting, setSubmitting] = React.useState(false);
   const [updating, setUpdating] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
+  const [dishSearch, setDishSearch] = React.useState("");
 
   const [menuImageFiles, setMenuImageFiles] = React.useState([]);
   const [newMenuImagePreviews, setNewMenuImagePreviews] = React.useState([]);
@@ -276,19 +277,31 @@ export default function OwnerMenu() {
       const matchStatus =
         filters.status === "all" || status === String(filters.status);
 
+      const matchCategory =
+        filters.categoryId === "all" ||
+        String(menu.menuCategoryId) === String(filters.categoryId);
+
       const min = filters.priceMin === "" ? null : Number(filters.priceMin);
       const max = filters.priceMax === "" ? null : Number(filters.priceMax);
 
       const matchMin = min === null || basePrice >= min;
       const matchMax = max === null || basePrice <= max;
 
-      return matchSearch && matchStatus && matchMin && matchMax;
+      return (
+        matchSearch && matchStatus && matchCategory && matchMin && matchMax
+      );
     });
   }, [allMenus, search, filters, getMenuPreviewDishes]);
 
   React.useEffect(() => {
     setPage(1);
-  }, [search, filters.status, filters.priceMin, filters.priceMax]);
+  }, [
+    search,
+    filters.categoryId,
+    filters.status,
+    filters.priceMin,
+    filters.priceMax,
+  ]);
 
   React.useEffect(() => {
     const nextTotalPages = Math.max(
@@ -316,19 +329,23 @@ export default function OwnerMenu() {
 
   const openCreateModal = () => {
     resetForm();
+    setDishSearch("");
     setOpenAddModal(true);
   };
 
   const openMenuDetail = (menu) => {
     setSelectedMenu(menu);
+
     setMenuForm({
       menuName: menu.menuName || "",
-      menuCategoryId: String(menu.menuCategoryId || ""),
+      menuCategoryId: resolveMenuCategoryIdFromMenu(menu, menuCategories),
       partyCategoryIds: normalizeIdArray(menu.partyCategoryIds),
       basePrice: String(menu.basePrice || ""),
       status: String(normalizeStatusValue(menu.status)),
       selectedDishIds: getMenuDishIds(menu.menuId),
     });
+
+    setDishSearch("");
     revokePreviewUrls(newMenuImagePreviews);
     setMenuImageFiles([]);
     setNewMenuImagePreviews([]);
@@ -410,7 +427,7 @@ export default function OwnerMenu() {
     setSubmitting(true);
 
     try {
-      const body = buildMenuFormData();
+      const body = buildMenuFormData({ includeStatus: true });
 
       const res = await fetch(`${API_URL}/api/menu`, {
         method: "POST",
@@ -542,6 +559,17 @@ export default function OwnerMenu() {
     });
   };
 
+  const filteredDishes = React.useMemo(() => {
+    const keyword = dishSearch.trim().toLowerCase();
+    if (!keyword) return dishes;
+
+    return dishes.filter((dish) =>
+      String(dish.dishName || "")
+        .toLowerCase()
+        .includes(keyword),
+    );
+  }, [dishes, dishSearch]);
+
   return (
     <div className="min-h-screen bg-[#FFFAF0] font-main">
       <Sidebar onExpandChange={setSbExpanded} />
@@ -596,95 +624,88 @@ export default function OwnerMenu() {
             </div>
 
             <div className="flex flex-wrap items-end justify-end gap-3">
-              {openFilter && (
-                <div className="rounded-2xl border border-[#F3D4C2] bg-white px-5 py-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-                  <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:min-h-[76px]">
-                    <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-3">
-                      <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
-                          Trạng thái
-                        </label>
-                        <select
-                          value={filters.status}
-                          onChange={(e) =>
-                            setFilters((prev) => ({
-                              ...prev,
-                              status: e.target.value,
-                            }))
-                          }
-                          className="h-11 w-full rounded-xl border border-gray-200 bg-[#FFFDFC] px-3 text-sm text-gray-700 outline-none transition focus:border-[#E8712E]"
-                        >
-                          {STATUS_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+              <div className="flex items-center gap-4">
+                <div className="text-sm font-medium text-gray-700">Lọc:</div>
+                <select
+                  value={filters.categoryId}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      categoryId: e.target.value,
+                    }))
+                  }
+                  className="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-[#E8712E]"
+                >
+                  <option value="all">Tất cả loại</option>
+                  {menuCategories.map((category) => {
+                    const id = getMenuCategoryId(category);
+                    const label = getMenuCategoryLabel(category);
+                    return (
+                      <option key={id} value={String(id)}>
+                        {label}
+                      </option>
+                    );
+                  })}
+                </select>
 
-                      <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
-                          Giá từ
-                        </label>
-                        <input
-                          type="number"
-                          value={filters.priceMin}
-                          onChange={(e) =>
-                            setFilters((prev) => ({
-                              ...prev,
-                              priceMin: e.target.value,
-                            }))
-                          }
-                          placeholder="0"
-                          className="h-11 w-full rounded-xl border border-gray-200 bg-[#FFFDFC] px-3 text-sm text-gray-700 outline-none transition focus:border-[#E8712E]"
-                        />
-                      </div>
+                <select
+                  value={filters.status}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      status: e.target.value,
+                    }))
+                  }
+                  className="h-10 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-[#E8712E]"
+                >
+                  {STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
 
-                      <div>
-                        <label className="mb-1 block text-sm font-medium text-gray-700">
-                          Giá đến
-                        </label>
-                        <input
-                          type="number"
-                          value={filters.priceMax}
-                          onChange={(e) =>
-                            setFilters((prev) => ({
-                              ...prev,
-                              priceMax: e.target.value,
-                            }))
-                          }
-                          placeholder="1000000"
-                          className="h-11 w-full rounded-xl border border-gray-200 bg-[#FFFDFC] px-3 text-sm text-gray-700 outline-none transition focus:border-[#E8712E]"
-                        />
-                      </div>
-                    </div>
+                <input
+                  type="number"
+                  value={filters.priceMin}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      priceMin: e.target.value,
+                    }))
+                  }
+                  placeholder="Giá từ"
+                  className="h-10 w-32 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-[#E8712E]"
+                />
 
-                    <div className="flex h-11 items-center gap-3 xl:shrink-0">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setFilters({
-                            status: "all",
-                            priceMin: "",
-                            priceMax: "",
-                          })
-                        }
-                        className="h-11 rounded-xl border border-gray-200 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-                      >
-                        Đặt lại
-                      </button>
+                <input
+                  type="number"
+                  value={filters.priceMax}
+                  onChange={(e) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      priceMax: e.target.value,
+                    }))
+                  }
+                  placeholder="Giá đến"
+                  className="h-10 w-32 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 outline-none focus:border-[#E8712E]"
+                />
 
-                      <button
-                        type="button"
-                        onClick={() => setOpenFilter(false)}
-                        className="h-11 rounded-xl bg-[#E8712E] px-5 text-sm font-semibold text-white transition hover:opacity-90"
-                      >
-                        Đóng
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFilters({
+                      categoryId: "all",
+                      status: "all",
+                      priceMin: "",
+                      priceMax: "",
+                    })
+                  }
+                  className="h-10 rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+                >
+                  Đặt lại
+                </button>
+              </div>
 
               <button
                 type="button"
@@ -739,7 +760,10 @@ export default function OwnerMenu() {
           onSubmit={handleCreateMenu}
           submitting={submitting}
           submitLabel={submitting ? "Đang thêm..." : "Lưu menu"}
-          showStatus={false}
+          showStatus
+          dishSearch={dishSearch}
+          setDishSearch={setDishSearch}
+          filteredDishes={filteredDishes}
         />
       )}
 
@@ -765,6 +789,9 @@ export default function OwnerMenu() {
           submitting={updating}
           submitLabel={updating ? "Đang lưu..." : "Cập nhật"}
           showStatus
+          dishSearch={dishSearch}
+          setDishSearch={setDishSearch}
+          filteredDishes={filteredDishes}
           footerLeft={
             <button
               type="button"
@@ -805,6 +832,9 @@ function MenuModal({
   submitting,
   submitLabel,
   showStatus,
+  dishSearch,
+  setDishSearch,
+  filteredDishes,
   footerLeft = null,
 }) {
   const allPreviewImages = [
@@ -888,11 +918,12 @@ function MenuModal({
             required
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+            <div className="flex flex-col">
+              <label className="mb-1 block text-sm font-medium text-gray-700">
                 Loại menu
               </label>
+
               <select
                 value={menuForm.menuCategoryId}
                 onChange={(e) =>
@@ -901,7 +932,7 @@ function MenuModal({
                     menuCategoryId: e.target.value,
                   }))
                 }
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
+                className="h-11 w-full rounded-lg border border-gray-300 px-3 outline-none focus:border-[#E8712E]"
                 required
               >
                 <option value="">Chọn loại menu</option>
@@ -915,42 +946,79 @@ function MenuModal({
                   );
                 })}
               </select>
-              {loadingCategories && (
-                <p className="mt-1 text-xs text-gray-500">
-                  Đang tải danh mục menu...
-                </p>
-              )}
-              {categoryError && (
-                <p className="mt-1 text-xs text-red-500">{categoryError}</p>
-              )}
+
+              <div className="mt-1 min-h-[20px]">
+                {loadingCategories && (
+                  <p className="text-xs text-gray-500">
+                    Đang tải danh mục menu...
+                  </p>
+                )}
+                {!loadingCategories && categoryError && (
+                  <p className="text-xs text-red-500">{categoryError}</p>
+                )}
+              </div>
             </div>
 
             {showStatus && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status
+              <div className="flex flex-col">
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Trạng thái
                 </label>
-                <select
-                  value={menuForm.status}
-                  onChange={(e) =>
-                    setMenuForm((prev) => ({ ...prev, status: e.target.value }))
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMenuForm((prev) => ({
+                      ...prev,
+                      status: prev.status === "1" ? "0" : "1",
+                    }))
                   }
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
+                  className="h-11 w-full rounded-lg bg-slate-100 px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
                 >
-                  <option value="1">Hoạt động</option>
-                  <option value="0">Ngưng hoạt động</option>
-                </select>
+                  {menuForm.status === "1"
+                    ? "Chuyển sang Ngưng hoạt động"
+                    : "Chuyển sang Hoạt động"}
+                </button>
+
+                <div className="mt-1 min-h-[20px]">
+                  <div
+                    className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(
+                      menuForm.status,
+                    )}`}
+                  >
+                    {getStatusLabel(menuForm.status)}
+                  </div>
+                </div>
               </div>
             )}
           </div>
 
-          <Field
-            label="BasePrice"
-            type="number"
-            value={menuForm.basePrice}
-            onChange={(v) => setMenuForm((prev) => ({ ...prev, basePrice: v }))}
-            required
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Giá cơ bản
+            </label>
+
+            <div className="relative">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={formatVndInput(menuForm.basePrice)}
+                onChange={(e) =>
+                  setMenuForm((prev) => ({
+                    ...prev,
+                    basePrice: sanitizeMoneyInput(e.target.value),
+                  }))
+                }
+                placeholder="Nhập giá cơ bản"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 pr-14 outline-none focus:border-[#E8712E]"
+                required
+              />
+
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+                VNĐ
+              </span>
+            </div>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1019,28 +1087,43 @@ function MenuModal({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Chọn món cho menu
             </label>
+            <div className="mb-3">
+              <input
+                type="text"
+                value={dishSearch}
+                onChange={(e) => setDishSearch(e.target.value)}
+                placeholder="Tìm theo tên món"
+                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 outline-none focus:border-[#E8712E] focus:ring-2 focus:ring-[#FFE7D9]"
+              />
+            </div>
             <div className="max-h-64 overflow-y-auto rounded-xl border border-gray-200 p-3 space-y-2">
-              {dishes.map((dish) => {
-                const checked = menuForm.selectedDishIds.includes(
-                  Number(dish.dishId),
-                );
+              {filteredDishes.length === 0 ? (
+                <div className="text-sm text-gray-500">
+                  Không tìm thấy món ăn nào.
+                </div>
+              ) : (
+                filteredDishes.map((dish) => {
+                  const checked = menuForm.selectedDishIds.includes(
+                    Number(dish.dishId),
+                  );
 
-                return (
-                  <label
-                    key={dish.dishId}
-                    className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-gray-50"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleDishSelection(dish.dishId)}
-                    />
-                    <span className="text-sm text-gray-800">
-                      {dish.dishName}
-                    </span>
-                  </label>
-                );
-              })}
+                  return (
+                    <label
+                      key={dish.dishId}
+                      className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-gray-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleDishSelection(dish.dishId)}
+                      />
+                      <span className="text-sm text-gray-800">
+                        {dish.dishName}
+                      </span>
+                    </label>
+                  );
+                })
+              )}
             </div>
           </div>
 
@@ -1095,7 +1178,11 @@ function MenuCard({ menu, previewItems, onClick }) {
               {partyLabel}
             </span>
           )}
-          <span className="rounded-full bg-[#F5F5F5] px-2 py-1 text-gray-600">
+          <span
+            className={`rounded-full px-2 py-1 text-xs font-semibold ${getStatusBadgeClass(
+              menu.status,
+            )}`}
+          >
             {getStatusLabel(menu.status)}
           </span>
         </div>
@@ -1239,6 +1326,12 @@ function getStatusLabel(status) {
   return normalizeStatusValue(status) === 1 ? "Hoạt động" : "Ngưng hoạt động";
 }
 
+function getStatusBadgeClass(status) {
+  return normalizeStatusValue(status) === 1
+    ? "bg-emerald-100 text-emerald-700"
+    : "bg-slate-100 text-slate-500";
+}
+
 function normalizeIdArray(value) {
   if (!Array.isArray(value)) return [];
   return value
@@ -1288,4 +1381,45 @@ function getDishImageUrl(img) {
   if (!img) return "";
   if (img.startsWith("http://") || img.startsWith("https://")) return img;
   return `${API_URL}${img}`;
+}
+function resolveMenuCategoryIdFromMenu(menu, menuCategories) {
+  const directId =
+    menu?.menuCategoryId ??
+    menu?.categoryId ??
+    menu?.id ??
+    menu?.menuCategory?.menuCategoryId ??
+    menu?.menuCategory?.id;
+
+  if (directId !== undefined && directId !== null && String(directId) !== "") {
+    return String(directId);
+  }
+
+  const menuCategoryName = String(
+    menu?.menuCategoryName ||
+      menu?.categoryName ||
+      menu?.menuCategory?.menuCategoryName ||
+      menu?.menuCategory?.name ||
+      "",
+  )
+    .trim()
+    .toLowerCase();
+
+  if (!menuCategoryName) return "";
+
+  const matched = menuCategories.find((category) => {
+    const label = String(getMenuCategoryLabel(category)).trim().toLowerCase();
+    return label === menuCategoryName;
+  });
+
+  return matched ? String(getMenuCategoryId(matched)) : "";
+}
+
+function sanitizeMoneyInput(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+function formatVndInput(value) {
+  const numeric = String(value || "").replace(/\D/g, "");
+  if (!numeric) return "";
+  return Number(numeric).toLocaleString("vi-VN");
 }

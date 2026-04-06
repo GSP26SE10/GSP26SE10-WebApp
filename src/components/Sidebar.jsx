@@ -199,7 +199,7 @@ export default function Sidebar({ onExpandChange }) {
               to="/owner/staff"
               expanded={expanded}
               icon={<UserRound className="h-4 w-4" />}
-              label="Nhân viên"
+              label="Nhân sự"
             />
             <SubItemLink
               to="/owner/staff-schedule"
