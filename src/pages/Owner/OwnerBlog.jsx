@@ -47,7 +47,6 @@ const EMPTY_POST_FORM = {
   title: "",
   slug: "",
   excerpt: "",
-  coverImageId: "",
   status: "Draft",
   blogCategoryId: "",
 };
@@ -94,6 +93,26 @@ function createEmptyBlock(type = 3, position = 1) {
   };
 }
 
+function normalizeImageUrls(img) {
+  if (Array.isArray(img)) {
+    return img.filter(Boolean);
+  }
+
+  if (typeof img === "string" && img.trim()) {
+    if (img.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(img);
+        return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+      } catch {
+        return [img];
+      }
+    }
+    return [img];
+  }
+
+  return [];
+}
+
 export default function OwnerBlog() {
   const [sbExpanded, setSbExpanded] = React.useState(false);
 
@@ -114,6 +133,9 @@ export default function OwnerBlog() {
 
   const [selectedPost, setSelectedPost] = React.useState(null);
   const [postForm, setPostForm] = React.useState(EMPTY_POST_FORM);
+  const [coverImageFiles, setCoverImageFiles] = React.useState([]);
+  const [coverImagePreviews, setCoverImagePreviews] = React.useState([]);
+  const [existingCoverImages, setExistingCoverImages] = React.useState([]);
   const [categoryForm, setCategoryForm] = React.useState(EMPTY_CATEGORY_FORM);
   const [blocks, setBlocks] = React.useState([createEmptyBlock(1, 1)]);
 
@@ -122,6 +144,20 @@ export default function OwnerBlog() {
   const [deletingPost, setDeletingPost] = React.useState(false);
   const [autoPostSlug, setAutoPostSlug] = React.useState(true);
   const [autoCategorySlug, setAutoCategorySlug] = React.useState(true);
+
+  const revokePreviewUrls = React.useCallback((urls) => {
+    urls.forEach((url) => {
+      if (typeof url === "string" && url.startsWith("blob:")) {
+        URL.revokeObjectURL(url);
+      }
+    });
+  }, []);
+
+  React.useEffect(() => {
+    return () => {
+      revokePreviewUrls(coverImagePreviews);
+    };
+  }, [coverImagePreviews, revokePreviewUrls]);
 
   const fetchJson = React.useCallback(async (url, options = {}) => {
     const res = await fetch(url, {
@@ -140,6 +176,35 @@ export default function OwnerBlog() {
     }
 
     return data;
+  }, []);
+
+  const uploadImageFile = React.useCallback(async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch(`${API_URL}/api/upload`, {
+      method: "POST",
+      body: formData,
+      headers: {
+        accept: "*/*",
+      },
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data?.message || "Upload ảnh thất bại");
+    }
+
+    return (
+      data?.url ||
+      data?.data?.url ||
+      data?.path ||
+      data?.data?.path ||
+      data?.imageUrl ||
+      data?.data?.imageUrl ||
+      ""
+    );
   }, []);
 
   const fetchAllPages = React.useCallback(
@@ -299,11 +364,15 @@ export default function OwnerBlog() {
   );
 
   const resetPostForm = React.useCallback(() => {
+    revokePreviewUrls(coverImagePreviews);
     setSelectedPost(null);
     setPostForm(EMPTY_POST_FORM);
+    setCoverImageFiles([]);
+    setCoverImagePreviews([]);
+    setExistingCoverImages([]);
     setBlocks([createEmptyBlock(1, 1)]);
     setAutoPostSlug(true);
-  }, []);
+  }, [coverImagePreviews, revokePreviewUrls]);
 
   const resetCategoryForm = React.useCallback(() => {
     setCategoryForm(EMPTY_CATEGORY_FORM);
@@ -328,14 +397,22 @@ export default function OwnerBlog() {
         title: post.title || "",
         slug: post.slug || "",
         excerpt: post.excerpt || "",
-        coverImageId:
-          post.coverImageId === null || post.coverImageId === undefined
-            ? ""
-            : String(post.coverImageId),
         status: normalizePostStatus(post.status),
         blogCategoryId: String(post.blogCategoryId || ""),
       });
       setAutoPostSlug(false);
+      revokePreviewUrls(coverImagePreviews);
+      setCoverImageFiles([]);
+      setCoverImagePreviews([]);
+      setExistingCoverImages(
+        normalizeImageUrls(
+          post.coverImageFiles ||
+            post.coverImages ||
+            post.coverImage ||
+            post.imgUrl ||
+            post.imageUrls,
+        ),
+      );
       setBlocks(
         blockItems.length > 0
           ? blockItems.map((item) => ({
@@ -479,21 +556,44 @@ export default function OwnerBlog() {
       slug: slugify(postForm.slug),
       title: postForm.title.trim(),
       excerpt: postForm.excerpt.trim(),
-      coverImageId: Number(postForm.coverImageId || 0),
       status: postStatusToApi(postForm.status),
       blogCategoryId: Number(postForm.blogCategoryId),
     };
 
     const isEdit = Boolean(selectedPost?.postId);
+    const url = isEdit
+      ? `${API_URL}/api/post/${selectedPost.postId}`
+      : `${API_URL}/api/post`;
 
-    const data = await fetchJson(
-      isEdit
-        ? `${API_URL}/api/post/${selectedPost.postId}`
-        : `${API_URL}/api/post`,
-      {
-        method: isEdit ? "PUT" : "POST",
-        body: JSON.stringify(payload),
+    const formData = new FormData();
+    formData.append("Slug", payload.slug);
+    formData.append("Title", payload.title);
+    formData.append("Excerpt", payload.excerpt);
+    formData.append("Status", String(payload.status));
+    formData.append("BlogCategoryId", String(payload.blogCategoryId));
+
+    coverImageFiles.forEach((file) => {
+      formData.append("CoverImageFiles", file);
+    });
+
+    const res = await fetch(url, {
+      method: isEdit ? "PUT" : "POST",
+      body: formData,
+      headers: {
+        accept: "*/*",
       },
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data?.message || "Lưu bài viết thất bại");
+    }
+    return (
+      data?.postId ||
+      data?.id ||
+      data?.data?.postId ||
+      data?.data?.id ||
+      selectedPost?.postId
     );
 
     return (
@@ -585,7 +685,7 @@ export default function OwnerBlog() {
     if (!selectedPost?.postId) return;
 
     const confirmed = window.confirm(
-      `Bạn có chắc muốn xóa bài viết \"${selectedPost.title}\" không?`,
+      `Bạn có chắc muốn xóa bài viết "${selectedPost.title}" không?`,
     );
     if (!confirmed) return;
 
@@ -818,6 +918,12 @@ export default function OwnerBlog() {
           selectedPost={selectedPost}
           form={postForm}
           setForm={setPostForm}
+          coverImageFiles={coverImageFiles}
+          setCoverImageFiles={setCoverImageFiles}
+          coverImagePreviews={coverImagePreviews}
+          setCoverImagePreviews={setCoverImagePreviews}
+          existingCoverImages={existingCoverImages}
+          setExistingCoverImages={setExistingCoverImages}
           blocks={blocks}
           categories={categories}
           autoSlug={autoPostSlug}
@@ -830,6 +936,8 @@ export default function OwnerBlog() {
           updateBlockField={updateBlockField}
           removeBlock={removeBlock}
           moveBlock={moveBlock}
+          uploadImageFile={uploadImageFile}
+          revokePreviewUrls={revokePreviewUrls}
           deleteButton={
             selectedPost ? (
               <button
@@ -859,16 +967,13 @@ function CategoryModal({
   submitting,
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl">
         <div className="mb-6 flex items-center justify-between gap-4">
           <div>
             <h3 className="text-2xl font-bold text-[#2F3A67]">
               Tạo danh mục blog
             </h3>
-            <p className="mt-1 text-sm text-[#8DA1C1]">
-              Slug sẽ tự sinh theo tên, bạn vẫn có thể chỉnh tay.
-            </p>
           </div>
           <button
             type="button"
@@ -940,6 +1045,12 @@ function PostModal({
   selectedPost,
   form,
   setForm,
+  coverImageFiles,
+  setCoverImageFiles,
+  coverImagePreviews,
+  setCoverImagePreviews,
+  existingCoverImages,
+  setExistingCoverImages,
   blocks,
   categories,
   autoSlug,
@@ -952,21 +1063,64 @@ function PostModal({
   updateBlockField,
   removeBlock,
   moveBlock,
+  uploadImageFile,
+  revokePreviewUrls,
   deleteButton,
 }) {
+  const allCoverPreviewImages = [
+    ...existingCoverImages.map((src) => ({ src, type: "existing" })),
+    ...coverImagePreviews.map((src) => ({ src, type: "new" })),
+  ];
+
+  const handleCoverImageChange = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const nextFiles = files.filter(
+      (file) =>
+        !coverImageFiles.some(
+          (existing) =>
+            existing.name === file.name &&
+            existing.size === file.size &&
+            existing.lastModified === file.lastModified,
+        ),
+    );
+
+    if (nextFiles.length === 0) {
+      e.target.value = "";
+      return;
+    }
+
+    const nextPreviews = nextFiles.map((file) => URL.createObjectURL(file));
+
+    setCoverImageFiles((prev) => [...prev, ...nextFiles]);
+    setCoverImagePreviews((prev) => [...prev, ...nextPreviews]);
+    e.target.value = "";
+  };
+
+  const removeNewCoverImage = (index) => {
+    setCoverImageFiles((prev) => prev.filter((_, idx) => idx !== index));
+    setCoverImagePreviews((prev) => {
+      const removed = prev[index];
+      revokePreviewUrls([removed]);
+      return prev.filter((_, idx) => idx !== index);
+    });
+  };
+
+  const removeExistingCoverImage = (index) => {
+    setExistingCoverImages((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-6xl rounded-3xl bg-white p-6 shadow-2xl max-h-[92vh] overflow-y-auto">
-        <div className="mb-6 flex items-center justify-between gap-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+      <div className="flex h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-[#ECE7DF] px-6 py-5">
           <div>
             <h3 className="text-2xl font-bold text-[#2F3A67]">
               {selectedPost ? "Cập nhật bài viết" : "Viết blog mới"}
             </h3>
-            <p className="mt-1 text-sm text-[#8DA1C1]">
-              Bảng post chỉ lưu thông tin ngoài bài viết, toàn bộ nội dung chi
-              tiết được quản lý bằng post-block.
-            </p>
           </div>
+
           <button
             type="button"
             onClick={onClose}
@@ -976,182 +1130,236 @@ function PostModal({
           </button>
         </div>
 
-        <form onSubmit={onSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 xl:grid-cols-[1.05fr_1.4fr] gap-6">
-            <div className="space-y-5">
-              <div className="rounded-2xl border border-[#ECE7DF] bg-[#FFFCFA] p-5 space-y-4">
-                <div className="text-lg font-bold text-[#2F3A67]">
-                  Thông tin bài viết
-                </div>
+        <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[1.02fr_1.18fr]">
+            <div className="flex min-h-0 flex-col border-r border-[#ECE7DF] bg-[#FFFCFA]">
+              <div className="hide-scrollbar min-h-0 flex-1 overflow-y-auto px-6 py-6">
+                <div className="space-y-6">
+                  <div className="rounded-2xl border border-[#ECE7DF] bg-white p-5">
+                    <div className="mb-4 text-lg font-bold text-[#2F3A67]">
+                      Thông tin bài viết
+                    </div>
 
-                <FormField label="Tiêu đề" required>
-                  <input
-                    type="text"
-                    value={form.title}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, title: e.target.value }))
-                    }
-                    className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
-                    placeholder="Nhập tiêu đề bài viết"
-                  />
-                </FormField>
+                    <div className="space-y-4">
+                      <FormField label="Tiêu đề" required>
+                        <input
+                          type="text"
+                          value={form.title}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              title: e.target.value,
+                            }))
+                          }
+                          className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
+                          placeholder="Nhập tiêu đề bài viết"
+                        />
+                      </FormField>
 
-                <FormField label="Slug" required>
-                  <input
-                    type="text"
-                    value={form.slug}
-                    onChange={(e) => {
-                      setAutoSlug(false);
-                      setForm((prev) => ({
-                        ...prev,
-                        slug: slugify(e.target.value),
-                      }));
-                    }}
-                    className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
-                    placeholder="slug-bai-viet"
-                  />
-                  <label className="mt-2 inline-flex items-center gap-2 text-xs text-[#6B7280]">
-                    <input
-                      type="checkbox"
-                      checked={autoSlug}
-                      onChange={(e) => setAutoSlug(e.target.checked)}
-                    />
-                    Tự sinh slug theo tiêu đề
-                  </label>
-                </FormField>
+                      <FormField label="Slug" required>
+                        <input
+                          type="text"
+                          value={form.slug}
+                          onChange={(e) => {
+                            setAutoSlug(false);
+                            setForm((prev) => ({
+                              ...prev,
+                              slug: slugify(e.target.value),
+                            }));
+                          }}
+                          className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
+                          placeholder="slug-bai-viet"
+                        />
+                        <label className="mt-2 inline-flex items-center gap-2 text-xs text-[#6B7280]">
+                          <input
+                            type="checkbox"
+                            checked={autoSlug}
+                            onChange={(e) => setAutoSlug(e.target.checked)}
+                          />
+                          Tự sinh slug theo tiêu đề
+                        </label>
+                      </FormField>
 
-                <FormField label="Mô tả ngắn hiển thị ngoài danh sách" required>
-                  <textarea
-                    rows={4}
-                    value={form.excerpt}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, excerpt: e.target.value }))
-                    }
-                    className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
-                    placeholder="Nhập mô tả ngắn cho card bài viết"
-                  />
-                </FormField>
+                      <FormField label="Mô tả ngắn" required>
+                        <textarea
+                          rows={4}
+                          value={form.excerpt}
+                          onChange={(e) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              excerpt: e.target.value,
+                            }))
+                          }
+                          className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
+                          placeholder="Nhập mô tả ngắn cho card bài viết"
+                        />
+                      </FormField>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField label="Trạng thái" required>
-                    <select
-                      value={form.status}
-                      onChange={(e) =>
-                        setForm((prev) => ({ ...prev, status: e.target.value }))
-                      }
-                      className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
-                    >
-                      {POST_STATUS_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </FormField>
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <FormField label="Trạng thái" required>
+                          <select
+                            value={form.status}
+                            onChange={(e) =>
+                              setForm((prev) => ({
+                                ...prev,
+                                status: e.target.value,
+                              }))
+                            }
+                            className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
+                          >
+                            {POST_STATUS_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </FormField>
 
-                  <FormField label="CoverImageId">
-                    <input
-                      type="number"
-                      min="0"
-                      value={form.coverImageId}
-                      onChange={(e) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          coverImageId: e.target.value,
-                        }))
-                      }
-                      className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
-                      placeholder="0"
-                    />
-                  </FormField>
-                </div>
+                        <FormField label="Ảnh bìa blog">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={handleCoverImageChange}
+                            className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
+                          />
 
-                <FormField label="Danh mục blog" required>
-                  <div className="flex gap-3">
-                    <select
-                      value={form.blogCategoryId}
-                      onChange={(e) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          blogCategoryId: e.target.value,
-                        }))
-                      }
-                      className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
-                    >
-                      <option value="">Chọn danh mục</option>
-                      {categories.map((category) => (
-                        <option
-                          key={category.blogCategoryId}
-                          value={String(category.blogCategoryId)}
-                        >
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
+                          {allCoverPreviewImages.length > 0 ? (
+                            <div className="mt-3 overflow-x-auto pb-2">
+                              <div className="flex gap-3">
+                                {allCoverPreviewImages.map((image, index) => (
+                                  <div
+                                    key={`${image.type}-${image.src}-${index}`}
+                                    className="relative h-40 min-w-[220px] overflow-hidden rounded-2xl border border-[#DCE6F7] bg-[#F8FAFF]"
+                                  >
+                                    <img
+                                      src={image.src}
+                                      alt={`cover-${index}`}
+                                      className="h-full w-full object-cover"
+                                    />
 
-                    <button
-                      type="button"
-                      onClick={onCreateCategory}
-                      className="shrink-0 inline-flex items-center gap-2 rounded-xl border border-[#2F3A67] bg-white px-4 py-3 text-sm font-semibold text-[#2F3A67] hover:bg-[#F7F9FC]"
-                    >
-                      <FolderPlus className="h-4 w-4" />
-                      Danh mục
-                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        image.type === "existing"
+                                          ? removeExistingCoverImage(index)
+                                          : removeNewCoverImage(
+                                              index -
+                                                existingCoverImages.length,
+                                            )
+                                      }
+                                      className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-gray-700 shadow-sm hover:bg-white"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </button>
+
+                                    <div className="absolute left-2 bottom-2 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white">
+                                      {index + 1}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                        </FormField>
+                      </div>
+
+                      <FormField label="Danh mục blog" required>
+                        <div className="flex gap-3">
+                          <select
+                            value={form.blogCategoryId}
+                            onChange={(e) =>
+                              setForm((prev) => ({
+                                ...prev,
+                                blogCategoryId: e.target.value,
+                              }))
+                            }
+                            className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
+                          >
+                            <option value="">Chọn danh mục</option>
+                            {categories.map((category) => (
+                              <option
+                                key={category.blogCategoryId}
+                                value={String(category.blogCategoryId)}
+                              >
+                                {category.name}
+                              </option>
+                            ))}
+                          </select>
+
+                          <button
+                            type="button"
+                            onClick={onCreateCategory}
+                            className="shrink-0 inline-flex items-center gap-2 rounded-xl border border-[#2F3A67] bg-white px-4 py-3 text-sm font-semibold text-[#2F3A67] hover:bg-[#F7F9FC]"
+                          >
+                            <FolderPlus className="h-4 w-4" />
+                            Danh mục
+                          </button>
+                        </div>
+                      </FormField>
+                    </div>
                   </div>
-                </FormField>
+
+                  <div className="space-y-4">
+                    {blocks.map((block, index) => (
+                      <BlockEditor
+                        key={block.localId}
+                        block={block}
+                        index={index}
+                        total={blocks.length}
+                        onChange={updateBlockField}
+                        onDelete={removeBlock}
+                        onMove={moveBlock}
+                        uploadImageFile={uploadImageFile}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="shrink-0 border-t border-[#ECE7DF] bg-white/95 px-6 py-4 backdrop-blur">
+                <div className="mb-3 text-sm font-semibold text-[#2F3A67]">
+                  Thêm khối nội dung
+                </div>
+                <div className="hide-scrollbar flex gap-2 overflow-x-auto pb-1">
+                  {Object.entries(BLOCK_TYPES).map(([value, meta]) => {
+                    const Icon = meta.icon;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => addBlock(Number(value))}
+                        className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-[#D6DFEF] bg-white px-3 py-2 text-sm font-medium text-[#2F3A67] hover:bg-[#F7F9FC]"
+                      >
+                        <Icon className="h-4 w-4" />
+                        {meta.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
-            <div className="space-y-5">
-              <div className="rounded-2xl border border-[#ECE7DF] bg-[#FFFCFA] p-5">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <div className="text-lg font-bold text-[#2F3A67]">
-                      Nội dung bài viết
-                    </div>
-                    <div className="mt-1 text-sm text-[#8DA1C1]">
-                      Thêm mới, cập nhật, xóa nội dung chỉ thao tác qua
-                      post-block.
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {Object.entries(BLOCK_TYPES).map(([value, meta]) => {
-                      const Icon = meta.icon;
-                      return (
-                        <button
-                          key={value}
-                          type="button"
-                          onClick={() => addBlock(Number(value))}
-                          className="inline-flex items-center gap-2 rounded-xl border border-[#D6DFEF] bg-white px-3 py-2 text-sm font-medium text-[#2F3A67] hover:bg-[#F7F9FC]"
-                        >
-                          <Icon className="h-4 w-4" />
-                          {meta.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+            <div className="flex min-h-0 flex-col bg-[#FFF8F2]">
+              <div className="shrink-0 border-b border-[#ECE7DF] bg-white px-6 py-4">
+                <div className="text-lg font-bold text-[#2F3A67]">
+                  Xem trước nội dung
                 </div>
               </div>
 
-              <div className="space-y-4">
-                {blocks.map((block, index) => (
-                  <BlockEditor
-                    key={block.localId}
-                    block={block}
-                    index={index}
-                    total={blocks.length}
-                    onChange={updateBlockField}
-                    onDelete={removeBlock}
-                    onMove={moveBlock}
-                  />
-                ))}
+              <div className="hide-scrollbar min-h-0 flex-1 overflow-y-auto px-6 py-6">
+                <PostPreview
+                  form={form}
+                  blocks={blocks}
+                  coverImages={allCoverPreviewImages.map((item) => item.src)}
+                />
               </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t border-[#ECE7DF] pt-4">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[#ECE7DF] bg-white px-6 py-4">
             <div>{deleteButton}</div>
+
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -1180,20 +1388,52 @@ function PostModal({
   );
 }
 
-function BlockEditor({ block, index, total, onChange, onDelete, onMove }) {
+function BlockEditor({
+  block,
+  index,
+  total,
+  onChange,
+  onDelete,
+  onMove,
+  uploadImageFile,
+}) {
   const meta = getBlockTypeMeta(block.type);
   const Icon = meta.icon;
+  const [uploading, setUploading] = React.useState(false);
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploading(true);
+      const uploadedUrl = await uploadImageFile(file);
+
+      if (!uploadedUrl) {
+        throw new Error("Không lấy được URL ảnh sau khi upload");
+      }
+
+      onChange(block.localId, "data", uploadedUrl);
+      toast.success("Upload ảnh thành công");
+    } catch (err) {
+      toast.error(err.message || "Upload ảnh thất bại");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
 
   return (
-    <div className="rounded-2xl border border-[#ECE7DF] bg-white p-5 shadow-sm">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="rounded-2xl border border-[#ECE7DF] bg-white p-4 shadow-sm">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EEF2FF] text-[#2F3A67]">
             <Icon className="h-5 w-5" />
           </div>
+
           <div>
             <div className="font-bold text-[#2F3A67]">{meta.label}</div>
-            <div className="text-xs text-[#8DA1C1]">Vị trí {index + 1}</div>
+            <div className="text-xs text-[#8DA1C1]">Block {index + 1}</div>
           </div>
         </div>
 
@@ -1224,69 +1464,197 @@ function BlockEditor({ block, index, total, onChange, onDelete, onMove }) {
         </div>
       </div>
 
-      <div>
-        {block.type === 1 && (
-          <input
-            type="text"
-            value={block.data}
-            onChange={(e) => onChange(block.localId, "data", e.target.value)}
-            placeholder="Nhập Heading 1"
-            className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-2xl font-bold outline-none focus:border-[#7CA3FF]"
-          />
-        )}
+      {block.type === 1 && (
+        <input
+          type="text"
+          value={block.data}
+          onChange={(e) => onChange(block.localId, "data", e.target.value)}
+          placeholder="Nhập tiêu đề lớn"
+          className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-xl font-bold outline-none focus:border-[#7CA3FF]"
+        />
+      )}
 
-        {block.type === 2 && (
-          <input
-            type="text"
-            value={block.data}
-            onChange={(e) => onChange(block.localId, "data", e.target.value)}
-            placeholder="Nhập Heading 2"
-            className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-xl font-semibold outline-none focus:border-[#7CA3FF]"
-          />
-        )}
+      {block.type === 2 && (
+        <input
+          type="text"
+          value={block.data}
+          onChange={(e) => onChange(block.localId, "data", e.target.value)}
+          placeholder="Nhập tiêu đề nhỏ"
+          className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-lg font-semibold outline-none focus:border-[#7CA3FF]"
+        />
+      )}
 
-        {block.type === 3 && (
-          <textarea
-            rows={6}
-            value={block.data}
-            onChange={(e) => onChange(block.localId, "data", e.target.value)}
-            placeholder="Nhập nội dung bài viết"
-            className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm leading-7 outline-none focus:border-[#7CA3FF]"
-          />
-        )}
+      {block.type === 3 && (
+        <textarea
+          rows={6}
+          value={block.data}
+          onChange={(e) => onChange(block.localId, "data", e.target.value)}
+          placeholder="Nhập nội dung bài viết"
+          className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm leading-7 outline-none focus:border-[#7CA3FF]"
+        />
+      )}
 
-        {block.type === 4 && (
-          <div className="space-y-3">
+      {block.type === 4 && (
+        <div className="space-y-3">
+          <label className="flex w-full cursor-pointer items-center justify-center rounded-xl border border-dashed border-[#D6DFEF] bg-[#FAFBFD] px-4 py-6 text-sm font-medium text-[#2F3A67] hover:bg-[#F7F9FC]">
             <input
-              type="text"
-              value={block.data}
-              onChange={(e) => onChange(block.localId, "data", e.target.value)}
-              placeholder="Nhập URL ảnh hoặc dữ liệu ảnh theo backend yêu cầu"
-              className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
             />
-            {block.data ? (
-              <div className="h-56 overflow-hidden rounded-2xl border border-[#ECE7DF] bg-[#FAFBFD]">
+            {uploading ? "Đang upload ảnh..." : "Chọn ảnh để upload"}
+          </label>
+
+          <input
+            type="text"
+            value={block.data}
+            onChange={(e) => onChange(block.localId, "data", e.target.value)}
+            placeholder="Hoặc dán URL ảnh tại đây"
+            className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
+          />
+
+          {!!block.data && (
+            <div className="overflow-hidden rounded-2xl border border-[#ECE7DF] bg-[#FAFBFD]">
+              <img
+                src={block.data}
+                alt="preview"
+                className="max-h-72 w-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {block.type === 5 && (
+        <textarea
+          rows={4}
+          value={block.data}
+          onChange={(e) => onChange(block.localId, "data", e.target.value)}
+          placeholder="Nhập câu trích dẫn"
+          className="w-full rounded-xl border border-[#DCE6F7] bg-[#FFFDF8] px-4 py-3 text-base italic leading-7 outline-none focus:border-[#7CA3FF]"
+        />
+      )}
+    </div>
+  );
+}
+
+function PostPreview({ form, blocks, coverImages = [] }) {
+  const sortedBlocks = [...blocks].sort(
+    (a, b) => Number(a.position || 0) - Number(b.position || 0),
+  );
+
+  return (
+    <div className="mx-auto w-full max-w-3xl rounded-[28px] border border-[#ECE7DF] bg-white p-6 md:p-8 shadow-sm">
+      <div className="border-b border-[#F1E7DA] pb-5">
+        <div className="mb-3 inline-flex rounded-full bg-[#EEF2FF] px-3 py-1 text-xs font-semibold text-[#2F3A67]">
+          {form.status === "Published" ? "Đã xuất bản" : "Bản nháp"}
+        </div>
+
+        <h1 className="text-3xl font-bold leading-tight text-[#2E6418]">
+          {form.title || "Tiêu đề bài viết sẽ hiện ở đây"}
+        </h1>
+
+        <p className="mt-3 text-base leading-7 text-[#5B6780]">
+          {form.excerpt || "Mô tả ngắn của bài viết sẽ hiện ở đây."}
+        </p>
+      </div>
+
+      {coverImages.length > 0 && (
+        <div className="mt-6 overflow-x-auto pb-2">
+          <div className="flex gap-3">
+            {coverImages.map((src, index) => (
+              <div
+                key={`${src}-${index}`}
+                className="h-52 min-w-[260px] overflow-hidden rounded-2xl border border-[#ECE7DF] bg-[#FAFBFD]"
+              >
+                <img
+                  src={src}
+                  alt={`cover-preview-${index}`}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-6 space-y-5">
+        {sortedBlocks.map((block) => {
+          if (!String(block.data || "").trim()) return null;
+
+          if (block.type === 1) {
+            return (
+              <h2
+                key={block.localId}
+                className="text-2xl font-bold leading-tight text-[#2F3A67]"
+              >
+                {block.data}
+              </h2>
+            );
+          }
+
+          if (block.type === 2) {
+            return (
+              <h3
+                key={block.localId}
+                className="text-xl font-semibold leading-tight text-[#2F3A67]"
+              >
+                {block.data}
+              </h3>
+            );
+          }
+
+          if (block.type === 3) {
+            return (
+              <p
+                key={block.localId}
+                className="whitespace-pre-wrap text-[15px] leading-8 text-[#374151]"
+              >
+                {block.data}
+              </p>
+            );
+          }
+
+          if (block.type === 4) {
+            return (
+              <div
+                key={block.localId}
+                className="overflow-hidden rounded-2xl border border-[#ECE7DF] bg-[#FAFBFD]"
+              >
                 <img
                   src={block.data}
-                  alt="block-preview"
-                  className="h-full w-full object-cover"
+                  alt="blog-content"
+                  className="max-h-[460px] w-full object-cover"
                   onError={(e) => {
                     e.currentTarget.style.display = "none";
                   }}
                 />
               </div>
-            ) : null}
-          </div>
-        )}
+            );
+          }
 
-        {block.type === 5 && (
-          <textarea
-            rows={4}
-            value={block.data}
-            onChange={(e) => onChange(block.localId, "data", e.target.value)}
-            placeholder="Nhập câu trích dẫn"
-            className="w-full rounded-xl border border-[#DCE6F7] bg-[#FFFDF8] px-4 py-3 text-base italic leading-7 outline-none focus:border-[#7CA3FF]"
-          />
+          if (block.type === 5) {
+            return (
+              <blockquote
+                key={block.localId}
+                className="rounded-2xl border-l-4 border-[#E8712E] bg-[#FFF8F2] px-5 py-4 text-lg italic leading-8 text-[#5B6780]"
+              >
+                “{block.data}”
+              </blockquote>
+            );
+          }
+
+          return null;
+        })}
+
+        {sortedBlocks.every((block) => !String(block.data || "").trim()) && (
+          <div className="rounded-2xl border border-dashed border-[#D6DFEF] bg-[#FAFBFD] px-5 py-10 text-center text-sm text-[#8DA1C1]">
+            Nội dung bài viết sẽ hiển thị ở đây khi bạn nhập block.
+          </div>
         )}
       </div>
     </div>

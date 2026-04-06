@@ -24,6 +24,7 @@ import OwnerAccountPage from "./pages/Owner/OwnerAccountPage";
 import OwnerBlog from "./pages/Owner/OwnerBlog";
 import OwnerFeedback from "./pages/Owner/OwnerFeedback";
 import OwnerTaskTemplate from "./pages/Owner/OwnerTaskTemplate";
+import OwnerExtraChargeCatalog from "./pages/Owner/OwnerExtraChargeCatalog";
 function RequireAuth({ children }) {
   const token =
     localStorage.getItem("accessToken") ||
@@ -60,6 +61,10 @@ export default function App() {
               <Route path="blog" element={<OwnerBlog />} />
               <Route path="feedback" element={<OwnerFeedback />} />
               <Route path="task-template" element={<OwnerTaskTemplate />} />
+              <Route
+                path="extra-charge"
+                element={<OwnerExtraChargeCatalog />}
+              />
             </Route>
           </Routes>
           <Toaster />
