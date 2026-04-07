@@ -1,4 +1,5 @@
 import React from "react";
+import { toast } from "sonner";
 import Sidebar from "@/components/Sidebar";
 import {
   Package,
@@ -56,9 +57,11 @@ export default function OwnerDashboard() {
 
   const handleUnauthorized = React.useCallback((res) => {
     if (res.status === 401) {
-      setOrderError("Phiên đăng nhập đã hết hạn.");
-      setRevenueError("Phiên đăng nhập đã hết hạn.");
-      setMenuError("Phiên đăng nhập đã hết hạn.");
+      const message = "Phiên đăng nhập đã hết hạn.";
+      setOrderError(message);
+      setRevenueError(message);
+      setMenuError(message);
+      toast.error(message);
     }
   }, []);
 
@@ -80,7 +83,9 @@ export default function OwnerDashboard() {
 
       setOrders(Array.isArray(data?.items) ? data.items : []);
     } catch (err) {
-      setOrderError(err.message || "Đã có lỗi xảy ra");
+      const message = err.message || "Đã có lỗi xảy ra";
+      setOrderError(message);
+      toast.error(message);
     } finally {
       setLoadingOrders(false);
     }
@@ -107,7 +112,9 @@ export default function OwnerDashboard() {
 
       setRevenueData(Array.isArray(data?.data) ? data.data : []);
     } catch (err) {
-      setRevenueError(err.message || "Không thể tải biểu đồ doanh thu");
+      const message = err.message || "Không thể tải biểu đồ doanh thu";
+      setRevenueError(message);
+      toast.error(message);
     } finally {
       setLoadingRevenue(false);
     }
@@ -131,7 +138,9 @@ export default function OwnerDashboard() {
 
       setMenus(Array.isArray(data?.items) ? data.items : []);
     } catch (err) {
-      setMenuError(err.message || "Không thể tải danh sách menu");
+      const message = err.message || "Không thể tải danh sách menu";
+      setMenuError(message);
+      toast.error(message);
     } finally {
       setLoadingMenus(false);
     }

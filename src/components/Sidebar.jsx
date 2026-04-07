@@ -6,15 +6,21 @@ import {
   List,
   BookOpen,
   Soup,
-  Folder,
+  FolderTree,
   ConciergeBell,
-  Gift,
-  Warehouse,
-  ClipboardList,
+  PartyPopper,
+  Boxes,
   Search,
-  Users,
   CalendarDays,
   User,
+  NotebookPen,
+  ReceiptText,
+  ShoppingCart,
+  Clock3,
+  BriefcaseBusiness,
+  UserRound,
+  ClipboardPenLine,
+  MessagesSquare,
 } from "lucide-react";
 
 export default function Sidebar({ onExpandChange }) {
@@ -27,19 +33,24 @@ export default function Sidebar({ onExpandChange }) {
   const { pathname } = useLocation();
 
   const isManageActive = [
-    "/menu",
-    "/mon-an",
-    "/danh-muc",
-    "/dich-vu",
-    "/tiec",
-    "/kho",
+    "/owner/menu",
+    "/owner/dish",
+    "/owner/dish-category",
+    "/owner/service",
+    "/owner/party-category",
+    "/owner/ingredient",
+    "/owner/blog",
+    "/owner/feedback",
+    "/owner/extra-charge",
+    "/owner/task-template",
   ].some((p) => pathname.startsWith(p));
 
-  const isOrdersActive = ["/orders", "/tra-cuu"].some((p) =>
-    pathname.startsWith(p),
-  );
+  const isOrdersActive = [
+    "/owner/orders/pending",
+    "/owner/orders/tracking",
+  ].some((p) => pathname.startsWith(p));
 
-  const isAssignActive = ["/nhan-vien", "/lich-trinh"].some((p) =>
+  const isAssignActive = ["/owner/staff", "/owner/staff-schedule"].some((p) =>
     pathname.startsWith(p),
   );
 
@@ -57,13 +68,13 @@ export default function Sidebar({ onExpandChange }) {
     <aside
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
-      className={`fixed left-0 top-0 z-50 h-screen bg-white border-r font-main flex flex-col
-      overflow-y-auto transition-all duration-300 ease-in-out
+      className={`fixed left-0 top-0 z-50 h-screen border-r bg-white font-main flex flex-col
+      transition-all duration-300 ease-in-out
       ${expanded ? "w-72" : "w-20"}`}
     >
-      {/* LOGO */}
-      <div className="h-20 flex items-center justify-center ">
-        <div className="font-logo text-[#E8712E] tracking-wide">
+      {/* LOGO - FIXED */}
+      <div className="h-20 shrink-0 flex items-center justify-center  bg-white">
+        <div className="font-logo tracking-wide text-[#E8712E]">
           {expanded ? (
             <span className="text-4xl">BOOKFET</span>
           ) : (
@@ -72,126 +83,147 @@ export default function Sidebar({ onExpandChange }) {
         </div>
       </div>
 
-      <nav
-        className={`flex-1 py-5 ${expanded ? "px-4" : "px-2"} text-gray-800`}
-      >
-        <NavItemLink
-          to="/owner/dashboard"
-          expanded={expanded}
-          icon={<LayoutGrid className="h-5 w-5" />}
-          label="Tổng quan"
-        />
+      {/* MENU - SCROLL */}
+      <div className="hide-scrollbar flex-1 overflow-y-auto">
+        <nav className={`py-5 ${expanded ? "px-4" : "px-2"} text-gray-800`}>
+          <NavItemLink
+            to="/owner/dashboard"
+            expanded={expanded}
+            icon={<LayoutGrid className="h-5 w-5" />}
+            label="Tổng quan"
+          />
 
-        {expanded && <SectionTitle>NHÀ HÀNG</SectionTitle>}
+          {expanded && <SectionTitle>NHÀ HÀNG</SectionTitle>}
 
-        {/* Quản lý */}
-        <Dropdown
-          expanded={expanded}
-          label="Quản lý"
-          icon={<List className="h-5 w-5" />}
-          open={openManage}
-          onToggle={() => setOpenManage((v) => !v)}
-          forceActive={isManageActive}
-        >
-          <SubItemLink
-            to="/owner/menu"
+          <Dropdown
             expanded={expanded}
-            icon={<BookOpen className="h-4 w-4" />}
-            label="Menu"
-          />
-          <SubItemLink
-            to="/owner/dish"
-            expanded={expanded}
-            icon={<Soup className="h-4 w-4" />}
-            label="Món ăn"
-          />
-          <SubItemLink
-            to="/owner/dish-category"
-            expanded={expanded}
-            icon={<Folder className="h-4 w-4" />}
-            label="Danh mục món ăn"
-          />
-          <SubItemLink
-            to="/owner/service"
-            expanded={expanded}
-            icon={<ConciergeBell className="h-4 w-4" />}
-            label="Dịch vụ"
-          />
-          <SubItemLink
-            to="/owner/party-category"
-            expanded={expanded}
-            icon={<Gift className="h-4 w-4" />}
-            label="Tiệc"
-          />
-          <SubItemLink
-            to="/owner/ingredient"
-            expanded={expanded}
-            icon={<Warehouse className="h-4 w-4" />}
-            label="Kho"
-          />
-        </Dropdown>
+            label="Quản lý"
+            icon={<List className="h-5 w-5" />}
+            open={openManage}
+            onToggle={() => setOpenManage((v) => !v)}
+            forceActive={isManageActive}
+          >
+            <SubItemLink
+              to="/owner/menu"
+              expanded={expanded}
+              icon={<BookOpen className="h-4 w-4" />}
+              label="Menu"
+            />
+            <SubItemLink
+              to="/owner/dish"
+              expanded={expanded}
+              icon={<Soup className="h-4 w-4" />}
+              label="Món ăn"
+            />
+            <SubItemLink
+              to="/owner/dish-category"
+              expanded={expanded}
+              icon={<FolderTree className="h-4 w-4" />}
+              label="Danh mục món ăn"
+            />
+            <SubItemLink
+              to="/owner/service"
+              expanded={expanded}
+              icon={<ConciergeBell className="h-4 w-4" />}
+              label="Dịch vụ"
+            />
+            <SubItemLink
+              to="/owner/party-category"
+              expanded={expanded}
+              icon={<PartyPopper className="h-4 w-4" />}
+              label="Tiệc"
+            />
+            <SubItemLink
+              to="/owner/ingredient"
+              expanded={expanded}
+              icon={<Boxes className="h-4 w-4" />}
+              label="Kho"
+            />
+            <SubItemLink
+              to="/owner/blog"
+              expanded={expanded}
+              icon={<NotebookPen className="h-4 w-4" />}
+              label="Blog"
+            />
+            <SubItemLink
+              to="/owner/feedback"
+              expanded={expanded}
+              icon={<MessagesSquare className="h-4 w-4" />}
+              label="Feedback"
+            />
+            <SubItemLink
+              to="/owner/extra-charge"
+              expanded={expanded}
+              icon={<ReceiptText className="h-4 w-4" />}
+              label="Chi phí phát sinh"
+            />
+            <SubItemLink
+              to="/owner/task-template"
+              expanded={expanded}
+              icon={<ClipboardPenLine className="h-4 w-4" />}
+              label="Task mẫu"
+            />
+          </Dropdown>
 
-        {/* Đơn hàng */}
-        <Dropdown
-          expanded={expanded}
-          label="Đơn hàng"
-          icon={<ClipboardList className="h-5 w-5" />}
-          open={openOrders}
-          onToggle={() => setOpenOrders((v) => !v)}
-          forceActive={isOrdersActive}
-        >
-          <SubItemLink
-            to="/owner/orders/pending"
+          <Dropdown
             expanded={expanded}
-            icon={<ClipboardList className="h-4 w-4" />}
-            label="Chờ duyệt"
-          />
-          <SubItemLink
-            to="/owner/orders/tracking"
-            expanded={expanded}
-            icon={<Search className="h-4 w-4" />}
-            label="Tra cứu"
-          />
-        </Dropdown>
+            label="Đơn hàng"
+            icon={<ShoppingCart className="h-5 w-5" />}
+            open={openOrders}
+            onToggle={() => setOpenOrders((v) => !v)}
+            forceActive={isOrdersActive}
+          >
+            <SubItemLink
+              to="/owner/orders/pending"
+              expanded={expanded}
+              icon={<Clock3 className="h-4 w-4" />}
+              label="Chờ duyệt"
+            />
+            <SubItemLink
+              to="/owner/orders/tracking"
+              expanded={expanded}
+              icon={<Search className="h-4 w-4" />}
+              label="Tra cứu"
+            />
+          </Dropdown>
 
-        {/* Phân công */}
-        <Dropdown
-          expanded={expanded}
-          label="Phân công"
-          icon={<Users className="h-5 w-5" />}
-          open={openAssign}
-          onToggle={() => setOpenAssign((v) => !v)}
-          forceActive={isAssignActive}
-        >
-          <SubItemLink
-            to="/owner/staff"
+          <Dropdown
             expanded={expanded}
-            icon={<Users className="h-4 w-4" />}
-            label="Nhân viên"
-          />
-          <SubItemLink
-            to="/owner/staff-schedule"
+            label="Phân công"
+            icon={<BriefcaseBusiness className="h-5 w-5" />}
+            open={openAssign}
+            onToggle={() => setOpenAssign((v) => !v)}
+            forceActive={isAssignActive}
+          >
+            <SubItemLink
+              to="/owner/staff"
+              expanded={expanded}
+              icon={<UserRound className="h-4 w-4" />}
+              label="Nhân sự"
+            />
+            <SubItemLink
+              to="/owner/staff-schedule"
+              expanded={expanded}
+              icon={<CalendarDays className="h-4 w-4" />}
+              label="Lịch trình"
+            />
+          </Dropdown>
+
+          {expanded && (
+            <>
+              <div className="my-6 border-t" />
+              <SectionTitle>CÀI ĐẶT</SectionTitle>
+            </>
+          )}
+
+          <NavItemLink
+            to="/owner/account"
             expanded={expanded}
-            icon={<CalendarDays className="h-4 w-4" />}
-            label="Lịch trình"
+            icon={<User className="h-5 w-5" />}
+            label="Tài khoản"
           />
-        </Dropdown>
-
-        {/* Cài đặt */}
-        {expanded && (
-          <>
-            <div className="my-6 border-t" />
-            <SectionTitle>CÀI ĐẶT</SectionTitle>
-          </>
-        )}
-
-        <NavItemLink
-          to="/owner/account"
-          expanded={expanded}
-          icon={<User className="h-5 w-5" />}
-          label="Tài khoản"
-        />
-      </nav>
+        </nav>
+      </div>
     </aside>
   );
 }
@@ -258,8 +290,7 @@ function Dropdown({
         onClick={expanded ? onToggle : undefined}
         className={`w-full flex items-center py-3 rounded-xl text-sm transition
           ${expanded ? "justify-between px-4" : "justify-center px-0"}
-          ${active ? "bg-[#F3F4F6]" : "hover:bg-gray-100"}
-        `}
+          ${active ? "bg-[#F3F4F6]" : "hover:bg-gray-100"}`}
         title={!expanded ? label : undefined}
       >
         <div className={`flex items-center ${expanded ? "gap-3" : ""}`}>
@@ -281,8 +312,7 @@ function Dropdown({
 
         <span
           className={`transition-all duration-300 ease-out
-            ${expanded ? "opacity-100 translate-x-0" : "opacity-0 translate-x-2"}
-          `}
+            ${expanded ? "opacity-100 translate-x-0" : "opacity-0 translate-x-2"}`}
         >
           <ChevronDown
             className={`h-4 w-4 text-gray-500 transition-transform duration-200 ${
