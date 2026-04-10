@@ -1,6 +1,7 @@
 import * as signalR from "@microsoft/signalr";
+import API_URL from "@/config/api";
 
-const HUB_URL = `${import.meta.env.VITE_API_URL}/chatHub`;
+const HUB_URL = `${API_URL}/chatHub`;
 
 export const hubConnection = new signalR.HubConnectionBuilder()
   .withUrl(HUB_URL, {

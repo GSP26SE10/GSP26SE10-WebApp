@@ -110,7 +110,7 @@ export default function OwnerDashboard() {
         throw new Error(data?.message || "Không thể tải biểu đồ doanh thu");
       }
 
-      setRevenueData(Array.isArray(data?.data) ? data.data : []);
+      setRevenueData(Array.isArray(data?.data?.data) ? data.data.data : []);
     } catch (err) {
       const message = err.message || "Không thể tải biểu đồ doanh thu";
       setRevenueError(message);

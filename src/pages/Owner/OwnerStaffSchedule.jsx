@@ -127,12 +127,12 @@ export default function OwnerStaffSchedule() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(data?.message || "Không thể tải lịch staff");
+        throw new Error(data?.message || "Không thể tải lịch làm nhân viên");
       }
 
       setStaffTasks(Array.isArray(data?.items) ? data.items : []);
     } catch (err) {
-      const msg = err.message || "Không thể tải lịch staff";
+      const msg = err.message || "Không thể tải lịch làm nhân viên";
       setErrorStaffTasks(msg);
       setStaffTasks([]);
       toast.error(msg);
@@ -312,7 +312,7 @@ export default function OwnerStaffSchedule() {
 
     return [
       { label: "Đơn hàng", value: orderEvents.length },
-      { label: "Lịch staff", value: staffEvents.length },
+      { label: "Lịch làm nhân viên", value: staffEvents.length },
       { label: "Hôm nay", value: todayEvents.length },
     ];
   }, [orderEvents.length, staffEvents.length, eventsByDate]);
@@ -1415,18 +1415,18 @@ function CompactOrderDetail({
 
       <div className="rounded-2xl bg-white border border-[#EEE8DE] p-4">
         <div className="text-[18px] font-bold text-[#2F3A67]">
-          Lịch làm của staff
+          Lịch làm của nhân viên
         </div>
 
         {loadingStaffTasks ? (
           <div className="mt-4 text-sm text-[#8DA1C1]">
-            Đang tải lịch staff...
+            Đang tải lịch làm nhân viên...
           </div>
         ) : errorStaffTasks ? (
           <div className="mt-4 text-sm text-red-500">{errorStaffTasks}</div>
         ) : staffTasks.length === 0 ? (
           <div className="mt-4 rounded-xl bg-[#FAF7F2] px-4 py-4 text-sm text-[#8DA1C1]">
-            Chưa có lịch làm staff cho đơn này.
+            Chưa có lịch làm nhân viên cho đơn này.
           </div>
         ) : (
           <div className="mt-4 space-y-3">
@@ -2020,5 +2020,5 @@ function formatInputDate(value) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+  return `${y}-${d}-${m}`;
 }
