@@ -158,8 +158,14 @@ export default function OwnerStaffSchedule() {
       details.forEach((detail) => {
         const start = detail?.startTime ? new Date(detail.startTime) : null;
         const end = detail?.endTime ? new Date(detail.endTime) : start;
+        const status = Number(detail?.status);
 
         if (!start || Number.isNaN(start.getTime())) return;
+
+        // Không hiện lên lịch:
+        // 1 = Chờ duyệt
+        // 7 = Đã hủy
+        if (status === 1 || status === 7) return;
 
         const orderDetailId = detail.orderDetailId;
         const colorKey = getColorKeyFromOrderDetailId(orderDetailId);
@@ -202,7 +208,20 @@ export default function OwnerStaffSchedule() {
 
     return result.sort((a, b) => a.start - b.start);
   }, [orders, search]);
+  const orderDetailStatusMap = React.useMemo(() => {
+    const map = new Map();
 
+    orders.forEach((order) => {
+      const details = Array.isArray(order?.orderDetails)
+        ? order.orderDetails
+        : [];
+      details.forEach((detail) => {
+        map.set(Number(detail.orderDetailId), Number(detail.status));
+      });
+    });
+
+    return map;
+  }, [orders]);
   const staffEvents = React.useMemo(() => {
     const keyword = search.trim().toLowerCase();
 
@@ -214,6 +233,12 @@ export default function OwnerStaffSchedule() {
         if (!start || Number.isNaN(start.getTime())) return null;
 
         const orderDetailId = task.orderDetailId;
+        const parentOrderStatus = orderDetailStatusMap.get(
+          Number(orderDetailId),
+        );
+
+        if (parentOrderStatus === 1 || parentOrderStatus === 7) return null;
+
         const colorKey = getColorKeyFromOrderDetailId(orderDetailId);
 
         const event = {
@@ -244,8 +269,7 @@ export default function OwnerStaffSchedule() {
       })
       .filter(Boolean)
       .sort((a, b) => a.start - b.start);
-  }, [staffTasks, search]);
-
+  }, [staffTasks, search, orderDetailStatusMap]);
   const allEvents = React.useMemo(() => {
     return [...orderEvents, ...staffEvents].sort((a, b) => a.start - b.start);
   }, [orderEvents, staffEvents]);
