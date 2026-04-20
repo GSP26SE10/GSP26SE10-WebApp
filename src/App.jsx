@@ -26,6 +26,7 @@ import OwnerFeedback from "./pages/Owner/OwnerFeedback";
 import OwnerTaskTemplate from "./pages/Owner/OwnerTaskTemplate";
 import OwnerExtraChargeCatalog from "./pages/Owner/OwnerExtraChargeCatalog";
 import OwnerContactRequest from "./pages/Owner/OwnerContactRequest";
+import OwnerMenuCategory from "./pages/Owner/OwnerMenuCategory";
 function RequireAuth({ children }) {
   const token =
     localStorage.getItem("accessToken") ||
@@ -63,6 +64,7 @@ export default function App() {
               <Route path="feedback" element={<OwnerFeedback />} />
               <Route path="task-template" element={<OwnerTaskTemplate />} />
               <Route path="contact-request" element={<OwnerContactRequest />} />
+              <Route path="menu-category" element={<OwnerMenuCategory />} />
               <Route
                 path="extra-charge"
                 element={<OwnerExtraChargeCatalog />}

@@ -123,6 +123,12 @@ export default function Sidebar({ onExpandChange }) {
               label="Danh mục món ăn"
             />
             <SubItemLink
+              to="/owner/menu-category"
+              expanded={expanded}
+              icon={<FolderTree className="h-4 w-4" />}
+              label="Danh mục menu"
+            />
+            <SubItemLink
               to="/owner/service"
               expanded={expanded}
               icon={<ConciergeBell className="h-4 w-4" />}

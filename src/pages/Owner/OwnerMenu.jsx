@@ -73,6 +73,17 @@ export default function OwnerMenu() {
   const [loadingCategories, setLoadingCategories] = React.useState(true);
   const [categoryError, setCategoryError] = React.useState("");
 
+  const EMPTY_MENU_CATEGORY_FORM = {
+    menuCategoryName: "",
+    description: "",
+  };
+
+  const [openMenuCategoryModal, setOpenMenuCategoryModal] =
+    React.useState(false);
+  const [menuCategoryForm, setMenuCategoryForm] = React.useState(
+    EMPTY_MENU_CATEGORY_FORM,
+  );
+  const [creatingMenuCategory, setCreatingMenuCategory] = React.useState(false);
   const revokePreviewUrls = React.useCallback((urls) => {
     urls.forEach((url) => {
       if (typeof url === "string" && url.startsWith("blob:")) {
@@ -267,6 +278,11 @@ export default function OwnerMenu() {
         .map((dish) => String(dish.dishName || "").toLowerCase())
         .join(" ");
 
+      const resolvedMenuCategoryId = resolveMenuCategoryIdFromMenu(
+        menu,
+        menuCategories,
+      );
+
       const matchSearch =
         !keyword ||
         menuName.includes(keyword) ||
@@ -279,7 +295,7 @@ export default function OwnerMenu() {
 
       const matchCategory =
         filters.categoryId === "all" ||
-        String(menu.menuCategoryId) === String(filters.categoryId);
+        String(resolvedMenuCategoryId) === String(filters.categoryId);
 
       const min = filters.priceMin === "" ? null : Number(filters.priceMin);
       const max = filters.priceMax === "" ? null : Number(filters.priceMax);
@@ -291,7 +307,7 @@ export default function OwnerMenu() {
         matchSearch && matchStatus && matchCategory && matchMin && matchMax
       );
     });
-  }, [allMenus, search, filters, getMenuPreviewDishes]);
+  }, [allMenus, search, filters, getMenuPreviewDishes, menuCategories]);
 
   React.useEffect(() => {
     setPage(1);
@@ -421,7 +437,59 @@ export default function OwnerMenu() {
 
     return formData;
   };
+  const handleCreateMenuCategory = async (e) => {
+    e.preventDefault();
 
+    if (!menuCategoryForm.menuCategoryName.trim()) {
+      toast.error("Vui lòng nhập tên danh mục menu.");
+      return;
+    }
+
+    setCreatingMenuCategory(true);
+
+    try {
+      const res = await fetch(`${API_URL}/api/menu-category`, {
+        method: "POST",
+        headers: {
+          accept: "*/*",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          menuCategoryName: menuCategoryForm.menuCategoryName.trim(),
+          description: menuCategoryForm.description.trim(),
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Thêm danh mục menu thất bại");
+      }
+
+      toast.success("Thêm danh mục menu thành công.");
+      await fetchCategories();
+
+      const createdId =
+        data?.menuCategoryId ||
+        data?.data?.menuCategoryId ||
+        data?.id ||
+        data?.data?.id;
+
+      if (createdId) {
+        setMenuForm((prev) => ({
+          ...prev,
+          menuCategoryId: String(createdId),
+        }));
+      }
+
+      setMenuCategoryForm(EMPTY_MENU_CATEGORY_FORM);
+      setOpenMenuCategoryModal(false);
+    } catch (err) {
+      toast.error(err.message || "Đã có lỗi xảy ra");
+    } finally {
+      setCreatingMenuCategory(false);
+    }
+  };
   const handleCreateMenu = async (e) => {
     e.preventDefault();
     setSubmitting(true);
@@ -764,6 +832,7 @@ export default function OwnerMenu() {
           dishSearch={dishSearch}
           setDishSearch={setDishSearch}
           filteredDishes={filteredDishes}
+          onOpenCreateCategory={() => setOpenMenuCategoryModal(true)}
         />
       )}
 
@@ -803,9 +872,73 @@ export default function OwnerMenu() {
               {deleting ? "Đang xóa..." : "Xóa menu"}
             </button>
           }
+          onOpenCreateCategory={() => setOpenMenuCategoryModal(true)}
         />
       )}
+      {openMenuCategoryModal && (
+        <div className="fixed inset-0 z-[110] bg-black/20 backdrop-blur-[2px] flex items-center justify-center p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h2 className="text-lg font-bold text-gray-900">
+                Thêm danh mục menu
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenMenuCategoryModal(false);
+                  setMenuCategoryForm(EMPTY_MENU_CATEGORY_FORM);
+                }}
+                className="p-2 rounded-full hover:bg-gray-100"
+              >
+                <X className="h-5 w-5 text-gray-600" />
+              </button>
+            </div>
 
+            <form onSubmit={handleCreateMenuCategory} className="p-6 space-y-4">
+              <Field
+                label="Tên danh mục"
+                value={menuCategoryForm.menuCategoryName}
+                onChange={(v) =>
+                  setMenuCategoryForm((prev) => ({
+                    ...prev,
+                    menuCategoryName: v,
+                  }))
+                }
+                required
+              />
+
+              <textarea
+                value={menuCategoryForm.description}
+                onChange={(e) =>
+                  setMenuCategoryForm((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
+                }
+                rows={4}
+                className="w-full rounded-lg border px-3 py-2"
+                placeholder="Mô tả"
+              />
+
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setOpenMenuCategoryModal(false)}
+                  className="border px-4 py-2 rounded-lg"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="bg-[#E8712E] text-white px-4 py-2 rounded-lg"
+                >
+                  Lưu
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
       <ChatPanel open={openChat} onClose={() => setOpenChat(false)} />
     </div>
   );
@@ -836,6 +969,7 @@ function MenuModal({
   setDishSearch,
   filteredDishes,
   footerLeft = null,
+  onOpenCreateCategory,
 }) {
   const allPreviewImages = [
     ...existingMenuImages.map((src) => ({ src, type: "existing" })),
@@ -918,79 +1052,55 @@ function MenuModal({
             required
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-            <div className="flex flex-col">
-              <label className="mb-1 block text-sm font-medium text-gray-700">
+          <div className="flex flex-col">
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <label className="block text-sm font-medium text-gray-700">
                 Loại menu
               </label>
 
-              <select
-                value={menuForm.menuCategoryId}
-                onChange={(e) =>
-                  setMenuForm((prev) => ({
-                    ...prev,
-                    menuCategoryId: e.target.value,
-                  }))
-                }
-                className="h-11 w-full rounded-lg border border-gray-300 px-3 outline-none focus:border-[#E8712E]"
-                required
+              <button
+                type="button"
+                onClick={onOpenCreateCategory}
+                className="inline-flex items-center gap-1 rounded-lg border border-[#F2B9A5] bg-[#FFF3EA] px-3 py-1 text-xs font-semibold text-[#E8712E] hover:bg-[#FFE7D9]"
               >
-                <option value="">Chọn loại menu</option>
-                {menuCategories.map((category) => {
-                  const id = getMenuCategoryId(category);
-                  const label = getMenuCategoryLabel(category);
-                  return (
-                    <option key={id} value={String(id)}>
-                      {label}
-                    </option>
-                  );
-                })}
-              </select>
-
-              <div className="mt-1 min-h-[20px]">
-                {loadingCategories && (
-                  <p className="text-xs text-gray-500">
-                    Đang tải danh mục menu...
-                  </p>
-                )}
-                {!loadingCategories && categoryError && (
-                  <p className="text-xs text-red-500">{categoryError}</p>
-                )}
-              </div>
+                <Plus className="h-3.5 w-3.5" />
+                Thêm danh mục
+              </button>
             </div>
 
-            {showStatus && (
-              <div className="flex flex-col">
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Trạng thái
-                </label>
+            <select
+              value={menuForm.menuCategoryId}
+              onChange={(e) =>
+                setMenuForm((prev) => ({
+                  ...prev,
+                  menuCategoryId: e.target.value,
+                }))
+              }
+              className="h-11 w-full rounded-lg border border-gray-300 px-3 outline-none focus:border-[#E8712E]"
+              required
+            >
+              <option value="">Chọn loại menu</option>
+              {menuCategories.map((category) => {
+                const id = getMenuCategoryId(category);
+                const label = getMenuCategoryLabel(category);
+                return (
+                  <option key={id} value={String(id)}>
+                    {label}
+                  </option>
+                );
+              })}
+            </select>
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    setMenuForm((prev) => ({
-                      ...prev,
-                      status: prev.status === "1" ? "0" : "1",
-                    }))
-                  }
-                  className="h-11 w-full rounded-lg bg-slate-100 px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
-                >
-                  {menuForm.status === "1"
-                    ? "Chuyển sang Ngưng hoạt động"
-                    : "Chuyển sang Hoạt động"}
-                </button>
-
-                <div className="mt-1 min-h-[20px]">
-                  <div
-                    className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(
-                      menuForm.status,
-                    )}`}
-                  >
-                    {getStatusLabel(menuForm.status)}
-                  </div>
-                </div>
-              </div>
-            )}
+            <div className="mt-1 min-h-[20px]">
+              {loadingCategories && (
+                <p className="text-xs text-gray-500">
+                  Đang tải danh mục menu...
+                </p>
+              )}
+              {!loadingCategories && categoryError && (
+                <p className="text-xs text-red-500">{categoryError}</p>
+              )}
+            </div>
           </div>
 
           <div>
