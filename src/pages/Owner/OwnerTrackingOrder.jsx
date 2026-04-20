@@ -19,6 +19,7 @@ import {
   Users,
   Wallet,
   Clock3,
+  Star,
 } from "lucide-react";
 
 export default function OwnerTrackingOrder() {
@@ -49,7 +50,16 @@ export default function OwnerTrackingOrder() {
   const token =
     localStorage.getItem("accessToken") ||
     sessionStorage.getItem("accessToken");
+  const FEEDBACK_MENU_ENDPOINT = `${API_URL}/api/feedback-menu`;
+  const FEEDBACK_SERVICE_ENDPOINT = `${API_URL}/api/feedback-service`;
+  const EXTRA_CHARGE_ENDPOINT = `${API_URL}/api/order-detail-extra-charge/order`;
 
+  const [menuFeedbacks, setMenuFeedbacks] = React.useState([]);
+  const [serviceFeedbacks, setServiceFeedbacks] = React.useState([]);
+  const [extraCharges, setExtraCharges] = React.useState([]);
+  const PAYMENT_ENDPOINT = `${API_URL}/api/payment`;
+  const [payments, setPayments] = React.useState([]);
+  const [loadingExtraCharges, setLoadingExtraCharges] = React.useState(false);
   const fetchOrders = React.useCallback(async () => {
     setLoading(true);
     setError("");
@@ -76,6 +86,119 @@ export default function OwnerTrackingOrder() {
       setLoading(false);
     }
   }, [token]);
+  const fetchAllPages = React.useCallback(
+    async (baseUrl) => {
+      let page = 1;
+      let allItems = [];
+      let hasMore = true;
+
+      while (hasMore) {
+        const res = await fetch(`${baseUrl}?page=${page}&pageSize=100`, {
+          headers: {
+            accept: "*/*",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          throw new Error(
+            data?.message || `Không thể tải dữ liệu từ ${baseUrl}`,
+          );
+        }
+
+        const items = Array.isArray(data?.items) ? data.items : [];
+        allItems = [...allItems, ...items];
+
+        const totalPages = Number(data?.totalPages || 1);
+        if (page >= totalPages || items.length === 0) {
+          hasMore = false;
+        } else {
+          page += 1;
+        }
+      }
+
+      return allItems;
+    },
+    [token],
+  );
+  const fetchPayments = React.useCallback(
+    async (orderId) => {
+      if (!orderId) return;
+
+      try {
+        const res = await fetch(
+          `${PAYMENT_ENDPOINT}?orderId=${orderId}&page=1&pageSize=100`,
+          {
+            headers: {
+              accept: "*/*",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          },
+        );
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) throw new Error("Không lấy được payment");
+
+        setPayments(Array.isArray(data?.items) ? data.items : []);
+      } catch (err) {
+        console.error("Lỗi payment:", err);
+        setPayments([]);
+      }
+    },
+    [token],
+  );
+  const fetchFeedbacks = React.useCallback(async () => {
+    try {
+      const [menuFb, serviceFb] = await Promise.all([
+        fetchAllPages(FEEDBACK_MENU_ENDPOINT).catch(() => []),
+        fetchAllPages(FEEDBACK_SERVICE_ENDPOINT).catch(() => []),
+      ]);
+
+      setMenuFeedbacks(Array.isArray(menuFb) ? menuFb : []);
+      setServiceFeedbacks(Array.isArray(serviceFb) ? serviceFb : []);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [fetchAllPages]);
+  React.useEffect(() => {
+    fetchFeedbacks();
+  }, [fetchFeedbacks]);
+  const fetchExtraChargesByDetail = React.useCallback(
+    async (orderDetailId) => {
+      if (!orderDetailId) {
+        setExtraCharges([]);
+        return;
+      }
+
+      setLoadingExtraCharges(true);
+
+      try {
+        const res = await fetch(`${EXTRA_CHARGE_ENDPOINT}/${orderDetailId}`, {
+          headers: {
+            accept: "*/*",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+
+        const data = await res.json().catch(() => []);
+
+        if (!res.ok) {
+          throw new Error("Không thể tải chi phí phát sinh");
+        }
+
+        setExtraCharges(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error(err);
+        setExtraCharges([]);
+      } finally {
+        setLoadingExtraCharges(false);
+      }
+    },
+    [token],
+  );
 
   const ownerId = React.useMemo(() => {
     const userRaw =
@@ -406,7 +529,11 @@ export default function OwnerTrackingOrder() {
     filteredOrders.find((order) => order.orderId === selectedOrderId) ||
     filteredOrders[0] ||
     null;
-
+  React.useEffect(() => {
+    if (selectedOrder?.orderId) {
+      fetchPayments(selectedOrder.orderId);
+    }
+  }, [selectedOrder, fetchPayments]);
   React.useEffect(() => {
     const firstDetail = selectedOrder?.orderDetails?.[0] || null;
 
@@ -430,7 +557,13 @@ export default function OwnerTrackingOrder() {
       selectedDetail?.staffGroupId ? String(selectedDetail.staffGroupId) : "",
     );
   }, [selectedDetail]);
-
+  React.useEffect(() => {
+    if (activeTab === "completed" && selectedDetail?.orderDetailId) {
+      fetchExtraChargesByDetail(selectedDetail.orderDetailId);
+    } else {
+      setExtraCharges([]);
+    }
+  }, [activeTab, selectedDetail, fetchExtraChargesByDetail]);
   const handleAssignStaffGroup = async () => {
     if (!selectedOrder || !selectedDetail) return;
 
@@ -545,14 +678,6 @@ export default function OwnerTrackingOrder() {
                 <h2 className="text-[28px] font-bold text-[#2F3A67]">
                   {activeTabInfo.heading}
                 </h2>
-
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-2 rounded-xl border border-[#D6DFEF] bg-white px-4 py-2 text-sm font-medium text-[#8DA1C1] hover:bg-gray-50"
-                >
-                  <Filter className="h-4 w-4" />
-                  Lọc
-                </button>
               </div>
 
               <div className="flex-1 min-h-0 overflow-y-auto hide-scrollbar space-y-4 pr-1">
@@ -674,6 +799,12 @@ export default function OwnerTrackingOrder() {
                   setSelectedOrderDetailId={setSelectedOrderDetailId}
                   onAssign={handleAssignStaffGroup}
                   onOpenChat={openCustomerChat}
+                  activeTab={activeTab}
+                  menuFeedbacks={menuFeedbacks}
+                  serviceFeedbacks={serviceFeedbacks}
+                  extraCharges={extraCharges}
+                  loadingExtraCharges={loadingExtraCharges}
+                  payments={payments}
                 />
               )}
             </section>
@@ -702,8 +833,6 @@ function OrderDetailPanel({
   order,
   detail,
   assigning,
-  message,
-  error,
   staffGroups,
   loadingStaffGroups,
   selectedStaffGroupId,
@@ -711,6 +840,12 @@ function OrderDetailPanel({
   setSelectedOrderDetailId,
   onAssign,
   onOpenChat,
+  activeTab,
+  menuFeedbacks,
+  serviceFeedbacks,
+  extraCharges,
+  loadingExtraCharges,
+  payments,
 }) {
   const orderDetails = Array.isArray(order?.orderDetails)
     ? order.orderDetails
@@ -722,6 +857,12 @@ function OrderDetailPanel({
   const firstImage = getFirstImage(menuSnapshot?.imgUrl);
   const mapSrc = getGoogleMapEmbedUrl(detail?.address);
   const canAssignStaffGroup = Number(order.status) === 2;
+  const isRejectedOrCancelled =
+    Number(order?.status) === 3 || Number(order?.status) === 8;
+
+  const { refunds, refundedAmount, refundPercentOfPaid, refundPercentOfTotal } =
+    getRefundSummary(order);
+  const isCompleted = activeTab === "completed" || Number(order?.status) === 7;
 
   const detailStatus = Number(detail?.status ?? 1);
   const statusSteps = buildOrderDetailStatusSteps(detailStatus);
@@ -740,9 +881,13 @@ function OrderDetailPanel({
           ? detail.additionalDishes
           : [];
 
-  const menuBasePrice = Number(menuSnapshot?.basePrice || 0);
+  const customDishItems = Array.isArray(
+    detail?.customDishSnapshot?.customDishes,
+  )
+    ? detail.customDishSnapshot.customDishes
+    : [];
 
-  const [openMenu, setOpenMenu] = React.useState(false);
+  const menuBasePrice = Number(menuSnapshot?.basePrice || 0);
 
   const serviceTotal = Array.isArray(serviceSnapshot?.services)
     ? serviceSnapshot.services.reduce(
@@ -751,16 +896,34 @@ function OrderDetailPanel({
       )
     : 0;
 
-  const customDishTotal = Array.isArray(
-    detail?.customDishSnapshot?.customDishes,
-  )
-    ? detail.customDishSnapshot.customDishes.reduce(
-        (sum, d) => sum + Number(d.totalAmount || 0),
-        0,
-      )
+  const customDishTotal = customDishItems.reduce(
+    (sum, d) => sum + Number(d.totalAmount || 0),
+    0,
+  );
+
+  const extraChargeTotal = Array.isArray(extraCharges)
+    ? extraCharges.reduce((sum, e) => sum + Number(e.totalAmount || 0), 0)
     : 0;
 
-  const extraCost = Number(detail?.extraChargeCost || 0);
+  const menuTotal = menuBasePrice * Number(detail?.numberOfGuests || 0);
+  const totalParty =
+    menuTotal + customDishTotal + serviceTotal + extraChargeTotal;
+
+  const paidAmount = payments.reduce(
+    (sum, p) => sum + Number(p.amount || 0),
+    0,
+  );
+
+  const remainingAmount = Math.max(totalParty - paidAmount, 0);
+
+  const feedbacks = [
+    ...(menuFeedbacks || []).filter(
+      (x) => Number(x.orderDetailId) === Number(detail?.orderDetailId),
+    ),
+    ...(serviceFeedbacks || []).filter(
+      (x) => Number(x.orderDetailId) === Number(detail?.orderDetailId),
+    ),
+  ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   const assignedStaffGroup =
     staffGroups.find(
@@ -770,6 +933,8 @@ function OrderDetailPanel({
       (group) => Number(group.staffGroupId) === Number(selectedStaffGroupId),
     ) ||
     null;
+
+  const [openMenu, setOpenMenu] = React.useState(false);
 
   return (
     <div className="space-y-5">
@@ -800,14 +965,6 @@ function OrderDetailPanel({
             >
               <MessageCircle className="h-4 w-4" />
               Chat
-            </button>
-
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-xl border border-[#DCE6F7] px-4 py-2 text-sm text-[#6B8FFB] hover:bg-[#F8FBFF]"
-            >
-              <CalendarDays className="h-4 w-4" />
-              Lịch trình
             </button>
           </div>
         </div>
@@ -875,204 +1032,165 @@ function OrderDetailPanel({
         </div>
       ) : null}
 
-      <div>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-[30px] font-bold text-[#2F3A67]">Chi tiết</h3>
-        </div>
-
-        <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr] gap-5">
-          <div className="space-y-5">
-            <div className="rounded-2xl bg-white p-5">
-              <div className="mb-4 flex items-center justify-between">
-                <div className="text-lg font-semibold text-[#2F3A67]">Menu</div>
-                <div className="text-xs font-medium text-[#8DA1C1]">
-                  {menuDishes.length} món
-                </div>
+      <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr] gap-5">
+        <div className="space-y-5">
+          <div className="rounded-2xl bg-white p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="text-lg font-semibold text-[#2F3A67]">Menu</div>
+              <div className="text-xs font-medium text-[#8DA1C1]">
+                {menuDishes.length} món
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-5 items-start">
-                <div className="h-[180px] overflow-hidden rounded-2xl bg-[#F5F5F5] border border-[#F1F2F6]">
-                  {firstImage ? (
-                    <img
-                      src={firstImage}
-                      alt={detail?.menuName || "menu"}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="h-full w-full flex items-center justify-center text-sm text-gray-400">
-                      Không có ảnh
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <div className="text-[24px] font-bold text-[#2F3A67]">
-                    {detail?.menuName || menuSnapshot?.menuName || "--"}
-                  </div>
-
-                  <div className="mt-2 text-sm text-[#8DA1C1]">
-                    {detail?.partyCategoryName || "--"}
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <InfoBox
-                      icon={<Users className="h-4 w-4" />}
-                      label="Số khách"
-                      value={`${detail?.numberOfGuests || 0} khách`}
-                    />
-                    <InfoBox
-                      icon={<Wallet className="h-4 w-4" />}
-                      label="Giá menu"
-                      value={formatPrice(menuBasePrice)}
-                    />
-                    <InfoBox
-                      icon={<Clock3 className="h-4 w-4" />}
-                      label="Bắt đầu"
-                      value={formatDateTime(detail?.startTime)}
-                    />
-                    <InfoBox
-                      icon={<Clock3 className="h-4 w-4" />}
-                      label="Kết thúc"
-                      value={formatDateTime(detail?.endTime)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-5 rounded-2xl border border-[#FDE7C7] bg-[#FFF9F2] px-5 py-4">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FFEAD5] text-[#E8712E]">
-                    <ClipboardList className="h-4 w-4" />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold uppercase tracking-wide text-[#B08968]">
-                        Ghi chú tiệc
-                      </span>
-                    </div>
-
-                    <div className="mt-1 text-sm leading-6 text-[#5B4636] whitespace-pre-wrap break-words">
-                      {detail?.noteOrderDetail ||
-                        "Không có ghi chú riêng cho tiệc này."}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setOpenMenu((prev) => !prev)}
-                className="mt-5 w-full rounded-2xl border border-[#EEF2F7] bg-[#FAFBFD] px-4 py-4 text-left transition hover:border-[#D9E4F5] hover:bg-[#F7F9FC]"
-              >
-                <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="text-xs font-medium uppercase tracking-wide text-[#8DA1C1]">
-                      Tên menu
-                    </div>
-                    <div className="mt-1 text-base font-semibold text-[#2B2B2B] break-words">
-                      {detail?.menuName || menuSnapshot?.menuName || "--"}
-                    </div>
-                  </div>
-
-                  <div
-                    className={`flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#8DA1C1] ring-1 ring-[#EEF2F7] transition-transform duration-200 ${
-                      openMenu ? "rotate-180" : ""
-                    }`}
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </div>
-                </div>
-              </button>
-
-              {openMenu ? (
-                <div className="mt-4 space-y-3">
-                  {menuDishes.length > 0 ? (
-                    menuDishes.map((dish, index) => (
-                      <div
-                        key={dish.dishId || index}
-                        className="flex items-center gap-3 rounded-2xl border border-[#F1F2F6] bg-[#FFFDFC] px-4 py-3"
-                      >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FFF1E8] text-[#E8712E]">
-                          <ChefHat className="h-4 w-4" />
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-[#2B2B2B] break-words">
-                            {dish.dishName}
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="rounded-xl bg-[#FAFBFD] px-4 py-3 text-sm text-gray-500">
-                      Không có món trong menu.
-                    </div>
-                  )}
-                </div>
-              ) : null}
             </div>
 
-            {Number(detail?.type) === 2 ? (
-              <div className="rounded-2xl bg-white p-5">
-                <div className="text-lg font-semibold text-[#2F3A67] mb-4">
-                  Món lẻ khách gọi thêm
+            <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-5 items-start">
+              <div className="h-[180px] overflow-hidden rounded-2xl bg-[#F5F5F5] border border-[#F1F2F6]">
+                {firstImage ? (
+                  <img
+                    src={firstImage}
+                    alt={detail?.menuName || "menu"}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center text-sm text-gray-400">
+                    Không có ảnh
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="text-[24px] font-bold text-[#2F3A67]">
+                  {detail?.menuName || menuSnapshot?.menuName || "--"}
                 </div>
 
-                {extraDishes.length > 0 ? (
-                  <div className="space-y-3">
-                    {extraDishes.map((dish, index) => (
-                      <div
-                        key={dish.dishId || dish.id || index}
-                        className="flex items-center gap-3 rounded-xl bg-[#F8F5F1] px-4 py-3"
-                      >
-                        <div className="h-10 w-10 rounded-full bg-[#FFF1E8] flex items-center justify-center text-[#E8712E] overflow-hidden">
-                          {dish.img ? (
-                            <img
-                              src={dish.img}
-                              alt={dish.dishName || "dish"}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <UtensilsCrossed className="h-4 w-4" />
-                          )}
-                        </div>
+                <div className="mt-2 text-sm text-[#8DA1C1]">
+                  {detail?.partyCategoryName || "--"}
+                </div>
 
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium text-[#2B2B2B]">
-                            {dish.dishName || dish.name || "Món lẻ"}
-                          </div>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <InfoBox
+                    icon={<Users className="h-4 w-4" />}
+                    label="Số khách"
+                    value={`${detail?.numberOfGuests || 0} khách`}
+                  />
+                  <InfoBox
+                    icon={<Wallet className="h-4 w-4" />}
+                    label="Giá menu"
+                    value={formatPrice(menuBasePrice)}
+                  />
+                  <InfoBox
+                    icon={<Clock3 className="h-4 w-4" />}
+                    label="Bắt đầu"
+                    value={formatDateTime(detail?.startTime)}
+                  />
+                  <InfoBox
+                    icon={<Clock3 className="h-4 w-4" />}
+                    label="Kết thúc"
+                    value={formatDateTime(detail?.endTime)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-[#FDE7C7] bg-[#FFF9F2] px-5 py-4">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FFEAD5] text-[#E8712E]">
+                  <ClipboardList className="h-4 w-4" />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-[#B08968]">
+                    Ghi chú tiệc
+                  </div>
+
+                  <div className="mt-1 text-sm leading-6 text-[#5B4636] whitespace-pre-wrap break-words">
+                    {detail?.noteOrderDetail ||
+                      "Không có ghi chú riêng cho tiệc này."}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setOpenMenu((prev) => !prev)}
+              className="mt-5 w-full rounded-2xl border border-[#EEF2F7] bg-[#FAFBFD] px-4 py-4 text-left transition hover:border-[#D9E4F5] hover:bg-[#F7F9FC]"
+            >
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="text-xs font-medium uppercase tracking-wide text-[#8DA1C1]">
+                    Tên menu
+                  </div>
+                  <div className="mt-1 text-base font-semibold text-[#2B2B2B] break-words">
+                    {detail?.menuName || menuSnapshot?.menuName || "--"}
+                  </div>
+                </div>
+
+                <div
+                  className={`flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#8DA1C1] ring-1 ring-[#EEF2F7] transition-transform duration-200 ${
+                    openMenu ? "rotate-180" : ""
+                  }`}
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </div>
+              </div>
+            </button>
+
+            {openMenu ? (
+              <div className="mt-4 space-y-3">
+                {menuDishes.length > 0 ? (
+                  menuDishes.map((dish, index) => (
+                    <div
+                      key={dish.dishId || index}
+                      className="flex items-center gap-3 rounded-2xl border border-[#F1F2F6] bg-[#FFFDFC] px-4 py-3"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#FFF1E8] text-[#E8712E]">
+                        <ChefHat className="h-4 w-4" />
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold text-[#2B2B2B] break-words">
+                          {dish.dishName}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))
                 ) : (
-                  <div className="text-sm text-gray-500">
-                    Chưa có món lẻ gọi thêm.
+                  <div className="rounded-xl bg-[#FAFBFD] px-4 py-3 text-sm text-gray-500">
+                    Không có món trong menu.
                   </div>
                 )}
               </div>
             ) : null}
+          </div>
 
+          {Number(detail?.type) === 2 ? (
             <div className="rounded-2xl bg-white p-5">
               <div className="text-lg font-semibold text-[#2F3A67] mb-4">
-                Dịch vụ đi kèm
+                Món lẻ khách gọi thêm
               </div>
 
-              {Array.isArray(serviceSnapshot?.services) &&
-              serviceSnapshot.services.length > 0 ? (
+              {extraDishes.length > 0 ? (
                 <div className="space-y-3">
-                  {serviceSnapshot.services.map((service) => (
+                  {extraDishes.map((dish, index) => (
                     <div
-                      key={service.serviceId}
-                      className="flex items-center justify-between rounded-xl bg-[#F8F5F1] px-4 py-3"
+                      key={dish.dishId || dish.id || index}
+                      className="flex items-center gap-3 rounded-xl bg-[#F8F5F1] px-4 py-3"
                     >
-                      <div>
+                      <div className="h-10 w-10 rounded-full bg-[#FFF1E8] flex items-center justify-center text-[#E8712E] overflow-hidden">
+                        {dish.img ? (
+                          <img
+                            src={dish.img}
+                            alt={dish.dishName || "dish"}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <UtensilsCrossed className="h-4 w-4" />
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
                         <div className="font-medium text-[#2B2B2B]">
-                          {service.serviceName}
-                        </div>
-                        <div className="text-sm text-[#8DA1C1]">
-                          Số lượng: {service.quantity || 1}
+                          {dish.dishName || dish.name || "Món lẻ"}
                         </div>
                       </div>
                     </div>
@@ -1080,210 +1198,396 @@ function OrderDetailPanel({
                 </div>
               ) : (
                 <div className="text-sm text-gray-500">
-                  Không có dịch vụ đi kèm.
+                  Chưa có món lẻ gọi thêm.
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          <div className="rounded-2xl bg-white p-5">
+            <div className="text-lg font-semibold text-[#2F3A67] mb-4">
+              Dịch vụ đi kèm
+            </div>
+
+            {Array.isArray(serviceSnapshot?.services) &&
+            serviceSnapshot.services.length > 0 ? (
+              <div className="space-y-3">
+                {serviceSnapshot.services.map((service) => (
+                  <div
+                    key={service.serviceId}
+                    className="flex items-center justify-between rounded-xl bg-[#F8F5F1] px-4 py-3"
+                  >
+                    <div>
+                      <div className="font-medium text-[#2B2B2B]">
+                        {service.serviceName}
+                      </div>
+                      <div className="text-sm text-[#8DA1C1]">
+                        Số lượng: {service.quantity || 1}
+                      </div>
+                    </div>
+                    <div className="font-semibold text-[#2F3A67]">
+                      {formatPrice(
+                        Number(service.basePrice || 0) *
+                          Number(service.quantity || 1),
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-gray-500">
+                Không có dịch vụ đi kèm.
+              </div>
+            )}
+          </div>
+
+          {isCompleted ? (
+            <div className="rounded-2xl bg-white p-5">
+              <div className="text-lg font-semibold mb-4 text-[#2F3A67]">
+                Chi phí phát sinh
+              </div>
+
+              {loadingExtraCharges ? (
+                <div className="text-sm text-gray-500">Đang tải...</div>
+              ) : extraCharges.length > 0 ? (
+                extraCharges.map((e, i) => (
+                  <div key={i} className="mb-4 border rounded-xl p-4">
+                    <div className="flex justify-between">
+                      <div>
+                        <div className="font-semibold text-[#2B2B2B]">
+                          {e.title}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {e.description || e.note}
+                        </div>
+                      </div>
+
+                      <div className="text-red-500 font-semibold">
+                        {formatPrice(e.totalAmount)}
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-gray-500 mt-1">
+                      {formatPrice(e.unitPrice)} x {e.quantity} {e.unit}
+                    </div>
+
+                    {e.image && (
+                      <div className="flex gap-2 mt-3 flex-wrap">
+                        {(Array.isArray(e.image) ? e.image : [e.image]).map(
+                          (url, idx) => (
+                            <img
+                              key={idx}
+                              src={url}
+                              alt={`extra-${idx + 1}`}
+                              className="h-20 w-20 object-cover rounded-xl border border-[#E5E7EB]"
+                            />
+                          ),
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="text-sm text-gray-500">
+                  Không có chi phí phát sinh
+                </div>
+              )}
+            </div>
+          ) : null}
+          <div className="rounded-2xl bg-white p-5">
+            <div className="text-lg font-semibold text-[#2F3A67] mb-4">
+              Thông tin thanh toán
+            </div>
+
+            <div className="space-y-2">
+              <PaymentGroup
+                label="Menu"
+                total={menuTotal}
+                items={[
+                  {
+                    name: menuSnapshot?.menuName || detail?.menuName || "Menu",
+                    unitPrice: menuBasePrice,
+                    quantity: detail?.numberOfGuests || 0,
+                    totalAmount: menuTotal,
+                  },
+                ]}
+                type="menu"
+              />
+
+              <PaymentGroup
+                label="Món lẻ"
+                total={customDishTotal}
+                items={customDishItems}
+                type="dish"
+                guestCount={detail?.numberOfGuests || 0}
+              />
+
+              <PaymentGroup
+                label="Dịch vụ"
+                total={serviceTotal}
+                items={serviceSnapshot?.services || []}
+                type="service"
+              />
+
+              <PaymentGroup
+                label="Chi phí đền bù / phát sinh"
+                total={extraChargeTotal}
+                items={extraCharges || []}
+                type="extraCharge"
+              />
+
+              <div className="pt-2 mt-2 border-t border-[#F1F2F6]">
+                <PaymentRow label="Tổng đơn" value={totalParty} highlight />
+              </div>
+
+              <div className="pt-2 mt-2 border-t border-[#F1F2F6]">
+                <PaymentRow label="Đã thanh toán" value={paidAmount} />
+                <PaymentRow label="Còn lại" value={remainingAmount} highlight />
+              </div>
+            </div>
+          </div>
+          {isRejectedOrCancelled ? (
+            <div className="rounded-2xl bg-white p-5">
+              <div className="text-lg font-semibold text-[#2F3A67] mb-4">
+                Thông tin hoàn tiền
+              </div>
+
+              {refundedAmount > 0 ? (
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-[#D1FAE5] bg-[#ECFDF5] p-4">
+                    <div className="text-sm text-[#047857]">
+                      Số tiền đã hoàn
+                    </div>
+                    <div className="mt-1 text-2xl font-bold text-[#065F46]">
+                      {formatPrice(refundedAmount)}
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-1  gap-3">
+                      <div className="rounded-xl bg-white px-4 py-3">
+                        <div className="text-xs text-[#6B7280]">
+                          Hoàn trên tiền đã thanh toán
+                        </div>
+                        <div className="mt-1 text-base font-semibold text-[#2B2B2B]">
+                          {refundPercentOfPaid}%
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {refunds.map((refund, index) => (
+                      <div
+                        key={refund.MRefundId || index}
+                        className="rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] px-4 py-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="font-medium text-[#2B2B2B]">
+                              Giao dịch hoàn tiền
+                            </div>
+                            <div className="mt-1 text-xs text-[#8DA1C1] break-all">
+                              {refund.MRefundId || "--"}
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            <div className="font-semibold text-[#E54B2D]">
+                              {formatPrice(refund.Amount)}
+                            </div>
+                            <div className="text-xs text-[#8DA1C1]">
+                              {formatDateTime(refund.CreatedAt)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-[#FEE2E2] bg-[#FEF2F2] px-4 py-3 text-sm text-[#991B1B]">
+                  Chưa có giao dịch hoàn tiền cho đơn này.
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="space-y-5">
+          <div className="rounded-2xl bg-white p-5">
+            <div className="h-[280px] overflow-hidden rounded-2xl bg-[#F5F5F5]">
+              {mapSrc ? (
+                <iframe
+                  title="Google Map"
+                  src={mapSrc}
+                  className="h-full w-full border-0"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                />
+              ) : (
+                <div className="h-full w-full flex items-center justify-center text-sm text-gray-400">
+                  Không có bản đồ
                 </div>
               )}
             </div>
 
-            <div className="rounded-2xl bg-white p-5">
-              <div className="text-lg font-semibold text-[#2F3A67] mb-4">
-                Thông tin thanh toán
-              </div>
-
-              <div className="space-y-2">
-                <div className="py-2">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-[#6B7280]">Menu</div>
-                    <div className="text-sm font-semibold text-[#2B2B2B]">
-                      {formatPrice(
-                        menuBasePrice * (detail?.numberOfGuests || 0),
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-2 pl-3 border-l border-[#E5E7EB]">
-                    <div className="flex items-center justify-between text-xs text-[#6B7280]">
-                      <span className="truncate">
-                        {menuSnapshot?.menuName || detail?.menuName || "Menu"}
-                      </span>
-                      <span className="text-right whitespace-nowrap">
-                        {formatPrice(menuBasePrice)} x{" "}
-                        {detail?.numberOfGuests || 0} khách ={" "}
-                        {formatPrice(
-                          menuBasePrice * (detail?.numberOfGuests || 0),
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <PaymentGroup
-                  label="Món lẻ"
-                  total={customDishTotal}
-                  items={detail?.customDishSnapshot?.customDishes || []}
-                  type="dish"
-                  guestCount={detail?.numberOfGuests || 0}
-                />
-
-                <PaymentGroup
-                  label="Dịch vụ"
-                  total={serviceTotal}
-                  items={serviceSnapshot?.services || []}
-                  type="service"
-                />
-
-                {extraCost > 0 && (
-                  <PaymentRow label="Phát sinh" value={extraCost} />
-                )}
-
-                <div className="pt-2 mt-2 border-t border-[#F1F2F6]">
-                  <PaymentRow
-                    label="Tổng tiền tiệc"
-                    value={detail?.totalPrice}
-                    highlight
-                  />
-                </div>
-
-                <div className="pt-2 mt-2 border-t border-[#F1F2F6]">
-                  <PaymentRow label="Tổng đơn" value={order?.totalPrice} />
-                  <PaymentRow label="Đã đặt cọc" value={order?.depositAmount} />
-                  <PaymentRow
-                    label="Còn lại"
-                    value={order?.remainingAmount}
-                    highlight
-                  />
-                </div>
+            <div className="mt-4">
+              <div className="flex items-center gap-2 text-[#6B8FFB]">
+                <MapPin className="h-4 w-4" />
+                <span className="font-medium text-[#2F3A67]">
+                  {detail?.address || "--"}
+                </span>
               </div>
             </div>
           </div>
 
-          <div className="space-y-5">
-            <div className="rounded-2xl bg-white p-5">
-              <div className="h-[280px] overflow-hidden rounded-2xl bg-[#F5F5F5]">
-                {mapSrc ? (
-                  <iframe
-                    title="Google Map"
-                    src={mapSrc}
-                    className="h-full w-full border-0"
-                    loading="lazy"
-                    referrerPolicy="no-referrer-when-downgrade"
-                  />
-                ) : (
-                  <div className="h-full w-full flex items-center justify-center text-sm text-gray-400">
-                    Không có bản đồ
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-4">
-                <div className="flex items-center gap-2 text-[#6B8FFB]">
-                  <MapPin className="h-4 w-4" />
-                  <span className="font-medium text-[#2F3A67]">
-                    {detail?.address || "--"}
-                  </span>
-                </div>
-              </div>
+          <div className="rounded-2xl bg-white p-5">
+            <div className="text-lg font-semibold text-[#2F3A67] mb-4">
+              Trạng thái tiệc
             </div>
 
-            <div className="rounded-2xl bg-white p-5">
-              <div className="text-lg font-semibold text-[#2F3A67] mb-4">
-                Trạng thái tiệc
-              </div>
-
-              <div className="mb-4">
-                <OrderDetailBadge status={detailStatus} />
-              </div>
-
-              <div className="space-y-4">
-                {statusSteps.map((step, index) => (
-                  <OrderStatusStep
-                    key={step.key}
-                    title={step.title}
-                    active={step.active}
-                    last={index === statusSteps.length - 1}
-                  />
-                ))}
-              </div>
+            <div className="mb-4">
+              <OrderDetailBadge status={detailStatus} />
             </div>
 
+            <div className="space-y-4">
+              {statusSteps.map((step, index) => (
+                <OrderStatusStep
+                  key={step.key}
+                  title={step.title}
+                  active={step.active}
+                  last={index === statusSteps.length - 1}
+                />
+              ))}
+            </div>
+          </div>
+
+          {isCompleted ? (
             <div className="rounded-2xl bg-white p-5">
-              <div className="text-lg font-semibold text-[#2F3A67] mb-3">
-                Nhóm phụ trách
+              <div className="text-lg font-semibold mb-4 text-[#2F3A67]">
+                Feedback khách hàng
               </div>
 
-              {canAssignStaffGroup ? (
-                <>
-                  <select
-                    value={selectedStaffGroupId}
-                    onChange={(e) => setSelectedStaffGroupId(e.target.value)}
-                    className="w-full rounded-xl border border-gray-200 bg-[#F8F5F1] px-4 py-3 text-sm outline-none"
-                  >
-                    <option value="">
-                      {loadingStaffGroups
-                        ? "Đang tải nhóm..."
-                        : "Chưa phân công"}
-                    </option>
-                    {staffGroups.map((group) => (
-                      <option
-                        key={group.staffGroupId}
-                        value={group.staffGroupId}
-                      >
-                        {group.staffGroupName}
-                        {group.leaderName ? ` - ${group.leaderName}` : ""}
-                      </option>
-                    ))}
-                  </select>
-
-                  {assignedStaffGroup ? (
-                    <div className="mt-3 rounded-xl border border-[#E5E7EB] bg-[#FAFBFD] px-4 py-3">
-                      <div className="text-xs text-[#8DA1C1]">
-                        Đang phụ trách
+              {feedbacks.length > 0 ? (
+                feedbacks.map((fb, i) => (
+                  <div key={i} className="mb-4 border rounded-xl p-4">
+                    <div className="flex justify-between">
+                      <div className="font-semibold text-[#2B2B2B]">
+                        {fb.customerName || "Khách hàng"}
                       </div>
-                      <div className="mt-1 font-semibold text-[#2F3A67]">
-                        {assignedStaffGroup.staffGroupName}
-                      </div>
-                      <div className="mt-1 text-sm text-[#6B7280]">
-                        {assignedStaffGroup.leaderName
-                          ? `Trưởng nhóm: ${assignedStaffGroup.leaderName}`
-                          : "Chưa có thông tin trưởng nhóm"}
+                      <div className="text-xs text-gray-400">
+                        {formatDateTime(fb.createdAt)}
                       </div>
                     </div>
-                  ) : null}
-                </>
-              ) : assignedStaffGroup ? (
-                <div className="rounded-xl border border-[#DCE6F7] bg-[#F8FBFF] px-4 py-4">
-                  <div className="text-xs font-medium text-[#8DA1C1]">
-                    Đang phụ trách
+
+                    <div className="flex gap-1 mt-2">
+                      {Array.from({ length: 5 }).map((_, idx) => (
+                        <Star
+                          key={idx}
+                          className={`h-4 w-4 ${
+                            idx < Number(fb.rating || 0)
+                              ? "fill-[#F59E0B] text-[#F59E0B]"
+                              : "text-gray-300"
+                          }`}
+                        />
+                      ))}
+                    </div>
+
+                    <div className="mt-2 text-sm text-[#2B2B2B]">
+                      {fb.comment || "Không có nội dung feedback."}
+                    </div>
+
+                    {fb.img && (
+                      <div className="flex gap-2 mt-3 flex-wrap">
+                        {(Array.isArray(fb.img) ? fb.img : [fb.img]).map(
+                          (url, idx) => (
+                            <img
+                              key={idx}
+                              src={url}
+                              alt={`feedback-${idx + 1}`}
+                              className="h-20 w-20 object-cover rounded-xl border border-[#E5E7EB]"
+                            />
+                          ),
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="mt-1 text-base font-semibold text-[#2F3A67]">
-                    {assignedStaffGroup.staffGroupName}
-                  </div>
-                  <div className="mt-1 text-sm text-[#6B7280]">
-                    {assignedStaffGroup.leaderName
-                      ? `Trưởng nhóm: ${assignedStaffGroup.leaderName}`
-                      : "Chưa có thông tin trưởng nhóm"}
-                  </div>
-                </div>
+                ))
               ) : (
-                <div className="rounded-xl border border-dashed border-[#E5E7EB] bg-[#FAFAFA] px-4 py-4 text-sm text-[#8DA1C1]">
-                  Chưa có nhóm phụ trách.
-                </div>
+                <div className="text-sm text-gray-500">Chưa có feedback</div>
               )}
             </div>
+          ) : null}
 
-            <div className="flex justify-end">
-              {canAssignStaffGroup ? (
-                <button
-                  type="button"
-                  onClick={onAssign}
-                  disabled={assigning}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#2F3A67] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
-                >
-                  <Save className="h-4 w-4" />
-                  {assigning ? "Đang gán..." : "Gán nhóm phụ trách"}
-                </button>
-              ) : null}
+          <div className="rounded-2xl bg-white p-5">
+            <div className="text-lg font-semibold text-[#2F3A67] mb-3">
+              Nhóm phụ trách
             </div>
+
+            {canAssignStaffGroup ? (
+              <>
+                <select
+                  value={selectedStaffGroupId}
+                  onChange={(e) => setSelectedStaffGroupId(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-[#F8F5F1] px-4 py-3 text-sm outline-none"
+                >
+                  <option value="">
+                    {loadingStaffGroups ? "Đang tải nhóm..." : "Chưa phân công"}
+                  </option>
+                  {staffGroups.map((group) => (
+                    <option key={group.staffGroupId} value={group.staffGroupId}>
+                      {group.staffGroupName}
+                      {group.leaderName ? ` - ${group.leaderName}` : ""}
+                    </option>
+                  ))}
+                </select>
+
+                {assignedStaffGroup ? (
+                  <div className="mt-3 rounded-xl border border-[#E5E7EB] bg-[#FAFBFD] px-4 py-3">
+                    <div className="text-xs text-[#8DA1C1]">Đang phụ trách</div>
+                    <div className="mt-1 font-semibold text-[#2F3A67]">
+                      {assignedStaffGroup.staffGroupName}
+                    </div>
+                    <div className="mt-1 text-sm text-[#6B7280]">
+                      {assignedStaffGroup.leaderName
+                        ? `Trưởng nhóm: ${assignedStaffGroup.leaderName}`
+                        : "Chưa có thông tin trưởng nhóm"}
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            ) : assignedStaffGroup ? (
+              <div className="rounded-xl border border-[#DCE6F7] bg-[#F8FBFF] px-4 py-4">
+                <div className="text-xs font-medium text-[#8DA1C1]">
+                  Đang phụ trách
+                </div>
+                <div className="mt-1 text-base font-semibold text-[#2F3A67]">
+                  {assignedStaffGroup.staffGroupName}
+                </div>
+                <div className="mt-1 text-sm text-[#6B7280]">
+                  {assignedStaffGroup.leaderName
+                    ? `Trưởng nhóm: ${assignedStaffGroup.leaderName}`
+                    : "Chưa có thông tin trưởng nhóm"}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-[#E5E7EB] bg-[#FAFAFA] px-4 py-4 text-sm text-[#8DA1C1]">
+                Chưa có nhóm phụ trách.
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end">
+            {canAssignStaffGroup ? (
+              <button
+                type="button"
+                onClick={onAssign}
+                disabled={assigning}
+                className="inline-flex items-center gap-2 rounded-xl bg-[#2F3A67] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+              >
+                <Save className="h-4 w-4" />
+                {assigning ? "Đang gán..." : "Gán nhóm phụ trách"}
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -1340,6 +1644,24 @@ function PaymentGroup({ label, total, items, type, guestCount = 0 }) {
       {items.length > 0 && (
         <div className="mt-2 space-y-1 pl-3 border-l border-[#E5E7EB]">
           {items.map((item, index) => {
+            if (type === "menu") {
+              const price = Number(item.unitPrice || 0);
+              const qty = Number(item.quantity || 0);
+              const total = Number(item.totalAmount || 0);
+
+              return (
+                <div
+                  key={index}
+                  className="flex items-center justify-between text-xs text-[#6B7280]"
+                >
+                  <span className="truncate">{item.name}</span>
+                  <span>
+                    {formatPrice(price)} x {qty} khách = {formatPrice(total)}
+                  </span>
+                </div>
+              );
+            }
+
             if (type === "service") {
               const price = Number(item.basePrice || 0);
               const qty = Number(item.quantity || 1);
@@ -1370,6 +1692,27 @@ function PaymentGroup({ label, total, items, type, guestCount = 0 }) {
                   <span className="truncate">{item.dishName}</span>
                   <span>
                     {formatPrice(price)} x {guestCount} khách ={" "}
+                    {formatPrice(total)}
+                  </span>
+                </div>
+              );
+            }
+
+            if (type === "extraCharge") {
+              const unitPrice = Number(item.unitPrice || 0);
+              const qty = Number(item.quantity || 1);
+              const total = Number(item.totalAmount || 0);
+
+              return (
+                <div
+                  key={item.orderDetailExtraChargeId || index}
+                  className="flex items-center justify-between text-xs text-[#6B7280]"
+                >
+                  <span className="truncate">
+                    {item.title || item.description || "Phát sinh"}
+                  </span>
+                  <span>
+                    {formatPrice(unitPrice)} x {qty} {item.unit || ""} ={" "}
                     {formatPrice(total)}
                   </span>
                 </div>
@@ -1585,4 +1928,49 @@ function formatDateTime(value) {
     month: "2-digit",
     year: "numeric",
   });
+}
+
+function Row({ label, value, highlight = false }) {
+  return (
+    <div className="flex justify-between py-2">
+      <span className="text-sm text-[#6B7280]">{label}</span>
+      <span
+        className={`text-sm font-semibold ${
+          highlight ? "text-[#E54B2D]" : "text-[#2B2B2B]"
+        }`}
+      >
+        {formatPrice(value)}
+      </span>
+    </div>
+  );
+}
+function getRefundSummary(order) {
+  const payments = Array.isArray(order?.mtdZlp?.Payments)
+    ? order.mtdZlp.Payments
+    : [];
+
+  const refunds = payments.flatMap((payment) =>
+    Array.isArray(payment?.Refunds) ? payment.Refunds : [],
+  );
+
+  const refundedAmount = refunds.reduce(
+    (sum, item) => sum + Number(item?.Amount || 0),
+    0,
+  );
+
+  const paidAmount = Number(order?.depositAmount || 0);
+  const totalAmount = Number(order?.totalPrice || 0);
+
+  const refundPercentOfPaid =
+    paidAmount > 0 ? Math.round((refundedAmount / paidAmount) * 100) : 0;
+
+  const refundPercentOfTotal =
+    totalAmount > 0 ? Math.round((refundedAmount / totalAmount) * 100) : 0;
+
+  return {
+    refunds,
+    refundedAmount,
+    refundPercentOfPaid,
+    refundPercentOfTotal,
+  };
 }

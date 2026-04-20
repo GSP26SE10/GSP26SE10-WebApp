@@ -43,6 +43,7 @@ export default function Sidebar({ onExpandChange }) {
     "/owner/feedback",
     "/owner/extra-charge",
     "/owner/task-template",
+    "/owner/contact-request",
   ].some((p) => pathname.startsWith(p));
 
   const isOrdersActive = [
@@ -83,7 +84,7 @@ export default function Sidebar({ onExpandChange }) {
         </div>
       </div>
 
-      {/* MENU - SCROLL */}
+      {/* MENU */}
       <div className="hide-scrollbar flex-1 overflow-y-auto">
         <nav className={`py-5 ${expanded ? "px-4" : "px-2"} text-gray-800`}>
           <NavItemLink
@@ -162,6 +163,12 @@ export default function Sidebar({ onExpandChange }) {
               expanded={expanded}
               icon={<ClipboardPenLine className="h-4 w-4" />}
               label="Task mẫu"
+            />
+            <SubItemLink
+              to="/owner/contact-request"
+              expanded={expanded}
+              icon={<MessagesSquare className="h-4 w-4" />}
+              label="Chăm sóc khách hàng"
             />
           </Dropdown>
 

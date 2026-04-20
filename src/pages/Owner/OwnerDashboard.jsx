@@ -21,7 +21,7 @@ export default function OwnerDashboard() {
   const [loadingOrders, setLoadingOrders] = React.useState(true);
   const [orderError, setOrderError] = React.useState("");
 
-  const [menus, setMenus] = React.useState([]);
+  const [topSellingMenus, setTopSellingMenus] = React.useState([]);
   const [loadingMenus, setLoadingMenus] = React.useState(true);
   const [menuError, setMenuError] = React.useState("");
 
@@ -64,7 +64,7 @@ export default function OwnerDashboard() {
       toast.error(message);
     }
   }, []);
-
+  const TOP_SELLING_MENUS_ENDPOINT = `${API_URL}/api/owner/top-selling-menus?top=5`;
   const fetchOrders = React.useCallback(async () => {
     setLoadingOrders(true);
     setOrderError("");
@@ -125,7 +125,7 @@ export default function OwnerDashboard() {
     setMenuError("");
 
     try {
-      const res = await fetch(`${API_URL}/api/menu?page=1&pageSize=6`, {
+      const res = await fetch(TOP_SELLING_MENUS_ENDPOINT, {
         headers: buildAuthHeaders(),
       });
 
@@ -133,12 +133,15 @@ export default function OwnerDashboard() {
       const data = await parseJsonSafe(res);
 
       if (!res.ok) {
-        throw new Error(data?.message || "Không thể tải danh sách menu");
+        throw new Error(
+          data?.message || "Không thể tải danh sách menu nổi bật",
+        );
       }
 
-      setMenus(Array.isArray(data?.items) ? data.items : []);
+      const items = Array.isArray(data?.data?.items) ? data.data.items : [];
+      setTopSellingMenus(items);
     } catch (err) {
-      const message = err.message || "Không thể tải danh sách menu";
+      const message = err.message || "Không thể tải danh sách menu nổi bật";
       setMenuError(message);
       toast.error(message);
     } finally {
@@ -263,14 +266,15 @@ export default function OwnerDashboard() {
   ];
 
   const topMenus = React.useMemo(() => {
-    return menus.slice(0, 4).map((menu, index) => ({
+    return topSellingMenus.map((menu, index) => ({
       id: menu.menuId || index,
-      name: menu.menuName || menu.name || `Menu ${index + 1}`,
-      price: Number(menu.basePrice || menu.price || 0),
-      image: getFirstImage(menu.imgUrl || menu.image || menu.thumbnail),
-      code: menu.menuCode || menu.code || `MN-${menu.menuId || index + 1}`,
+      name: menu.menuName || `Menu ${index + 1}`,
+      image: getFirstImage(menu.imgUrl),
+      totalOrders: Number(menu.totalOrders || 0),
+      totalGuests: Number(menu.totalGuests || 0),
+      soldQuantity: Number(menu.soldQuantity || 0),
     }));
-  }, [menus]);
+  }, [topSellingMenus]);
 
   const handleOpenPendingOrder = (orderId) => {
     navigate(`/owner/orders/pending?orderId=${orderId}`);
@@ -478,11 +482,15 @@ export default function OwnerDashboard() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {topMenus.map((menu) => (
+                  {topMenus.map((menu, index) => (
                     <div
                       key={menu.id}
                       className="flex items-center gap-3 rounded-xl border border-[#F1F2F6] p-3 hover:bg-[#FFF9F3]"
                     >
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#FFF1E8] text-xs font-bold text-[#E8712E]">
+                        {index + 1}
+                      </div>
+
                       <div className="h-14 w-14 rounded-xl overflow-hidden bg-[#F6F7FB] shrink-0">
                         {menu.image ? (
                           <img
@@ -501,13 +509,11 @@ export default function OwnerDashboard() {
                         <div className="text-sm font-semibold text-[#2F3A67] truncate">
                           {menu.name}
                         </div>
-                        <div className="text-xs text-[#94A3B8] mt-1">
-                          {menu.code}
-                        </div>
-                      </div>
 
-                      <div className="text-sm font-bold text-[#E8712E] whitespace-nowrap">
-                        {formatPrice(menu.price)}
+                        <div className="mt-1 text-xs text-[#94A3B8]">
+                          {menu.soldQuantity} suất • {menu.totalOrders} đơn •{" "}
+                          {menu.totalGuests} khách
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -582,6 +588,8 @@ function RevenueAreaChart({ data, viewMode }) {
   const chartHeight = height - paddingTop - paddingBottom;
   const maxRevenue = Math.max(...data.map((d) => Number(d.revenue || 0)), 1);
 
+  const [hoveredPoint, setHoveredPoint] = React.useState(null);
+
   const points = data.map((item, index) => {
     const x =
       data.length === 1
@@ -601,15 +609,24 @@ function RevenueAreaChart({ data, viewMode }) {
     };
   });
 
-  const linePath = points
-    .map((p, index) => `${index === 0 ? "M" : "L"} ${p.x} ${p.y}`)
-    .join(" ");
+  const linePath = points.reduce((path, point, i, arr) => {
+    if (i === 0) return `M ${point.x} ${point.y}`;
 
-  const areaPath = `${linePath} L ${
-    points[points.length - 1]?.x ?? width - paddingX
-  } ${height - paddingBottom} L ${points[0]?.x ?? paddingX} ${
-    height - paddingBottom
-  } Z`;
+    const prev = arr[i - 1];
+
+    const cp1x = prev.x + (point.x - prev.x) / 2;
+    const cp1y = prev.y;
+
+    const cp2x = prev.x + (point.x - prev.x) / 2;
+    const cp2y = point.y;
+
+    return `${path} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${point.x} ${point.y}`;
+  }, "");
+
+  const areaPath =
+    linePath +
+    ` L ${points[points.length - 1].x} ${height - paddingBottom}` +
+    ` L ${points[0].x} ${height - paddingBottom} Z`;
 
   return (
     <div className="w-full">
@@ -647,20 +664,72 @@ function RevenueAreaChart({ data, viewMode }) {
             fill="none"
             stroke="#E54B2D"
             strokeWidth="5"
-            strokeLinejoin="round"
-            strokeLinecap="round"
+            style={{ transition: "all 0.3s ease" }}
           />
 
-          {points.map((p) => (
-            <circle
-              key={`${p.label}-${p.x}`}
-              cx={p.x}
-              cy={p.y}
-              r="4"
-              fill="#E54B2D"
-            />
-          ))}
+          {points.map((p, index) => {
+            const next = points[index + 1];
+            const prev = points[index - 1];
+
+            const left = prev
+              ? (prev.x + p.x) / 2
+              : p.x - (next ? (next.x - p.x) / 2 : 50);
+
+            const right = next
+              ? (p.x + next.x) / 2
+              : p.x + (p.x - (prev ? prev.x : p.x - 50));
+
+            const width = right - left;
+
+            const isActive = hoveredPoint?.index === index;
+
+            return (
+              <g key={index}>
+                <rect
+                  x={left}
+                  y={paddingTop}
+                  width={width}
+                  height={chartHeight}
+                  fill="transparent"
+                  onMouseEnter={() => setHoveredPoint({ ...p, index })}
+                  onMouseLeave={() => setHoveredPoint(null)}
+                  style={{ cursor: "pointer" }}
+                />
+
+                <circle cx={p.x} cy={p.y} r={isActive ? 7 : 5} fill="#E54B2D" />
+
+                {isActive && (
+                  <line
+                    x1={p.x}
+                    y1={paddingTop}
+                    x2={p.x}
+                    y2={height - paddingBottom}
+                    stroke="#E54B2D"
+                    strokeDasharray="4 4"
+                    strokeOpacity="0.3"
+                  />
+                )}
+              </g>
+            );
+          })}
         </svg>
+
+        {hoveredPoint ? (
+          <div
+            className="pointer-events-none absolute z-20 -translate-x-1/2 rounded-xl bg-[#1F2937] px-3 py-2 text-xs text-white shadow-lg"
+            style={{
+              left: `${(hoveredPoint.x / width) * 100}%`,
+              top: `${(hoveredPoint.y / height) * 100 - 8}%`,
+            }}
+          >
+            <div className="font-semibold">
+              {formatRevenueLabel(hoveredPoint.label, viewMode)}
+            </div>
+            <div className="mt-1 whitespace-nowrap">
+              {formatPrice(hoveredPoint.revenue)}
+            </div>
+          </div>
+        ) : null}
 
         <div className="absolute bottom-0 left-0 right-0 flex justify-between px-2 text-xs text-[#94A3B8] gap-2 overflow-hidden">
           {data.map((item) => (
@@ -774,4 +843,17 @@ function formatDateTime(dateString) {
     month: "2-digit",
     year: "numeric",
   });
+}
+function Tooltip({ children, content }) {
+  return (
+    <div className="relative group inline-block">
+      {children}
+
+      <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block">
+        <div className="rounded-lg bg-black text-white text-xs px-3 py-2 shadow-lg whitespace-nowrap">
+          {content}
+        </div>
+      </div>
+    </div>
+  );
 }

@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import API_URL from "@/config/api";
+import cities from "@/assets/city.json";
 import {
   Users,
   UserPlus,
@@ -23,6 +24,9 @@ const EMPTY_USER_FORM = {
   FullName: "",
   Email: "",
   Address: "",
+  StreetAddress: "",
+  CityCode: "",
+  WardCode: "",
   Phone: "",
   RoleId: "",
   AvatarFile: null,
@@ -53,7 +57,6 @@ const TAB_ITEMS = [
 export default function OwnerStaffManagement() {
   const [sbExpanded, setSbExpanded] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState("staff");
-
   const [users, setUsers] = React.useState([]);
   const [roles, setRoles] = React.useState([]);
   const [groups, setGroups] = React.useState([]);
@@ -323,6 +326,27 @@ export default function OwnerStaffManagement() {
     [employeeUsers, customerUsers, groups],
   );
 
+  const selectedCity = React.useMemo(
+    () =>
+      cities.find((item) => String(item.code) === String(userForm.CityCode)),
+    [userForm.CityCode],
+  );
+
+  const wardOptions = React.useMemo(
+    () => selectedCity?.wards || [],
+    [selectedCity],
+  );
+
+  const previewAddress = React.useMemo(
+    () =>
+      buildFullAddress(
+        userForm.StreetAddress,
+        userForm.CityCode,
+        userForm.WardCode,
+      ),
+    [userForm.StreetAddress, userForm.CityCode, userForm.WardCode],
+  );
+
   const resetUserForm = () => {
     setUserForm(EMPTY_USER_FORM);
     setEditingUserId(null);
@@ -341,6 +365,8 @@ export default function OwnerStaffManagement() {
   };
 
   const openEditUserModal = (item) => {
+    const parsedAddress = parseAddressToForm(item.address || "");
+
     setUserModalMode("edit");
     setEditingUserId(item.userId);
     setUserForm({
@@ -349,6 +375,9 @@ export default function OwnerStaffManagement() {
       FullName: item.fullName || "",
       Email: item.email || "",
       Address: item.address || "",
+      StreetAddress: parsedAddress.StreetAddress,
+      CityCode: parsedAddress.CityCode,
+      WardCode: parsedAddress.WardCode,
       Phone: item.phone || "",
       RoleId: String(resolveRoleId(item, roles) || ""),
       AvatarFile: null,
@@ -400,7 +429,10 @@ export default function OwnerStaffManagement() {
     }
     if (!userForm.FullName.trim()) return "Vui lòng nhập họ tên.";
     if (!userForm.Email.trim()) return "Vui lòng nhập email.";
-    if (!userForm.Address.trim()) return "Vui lòng nhập địa chỉ.";
+    if (!userForm.StreetAddress.trim())
+      return "Vui lòng nhập số nhà, tên đường.";
+    if (!userForm.CityCode) return "Vui lòng chọn tỉnh/thành.";
+    if (!userForm.WardCode) return "Vui lòng chọn phường/xã.";
     if (!userForm.Phone.trim()) return "Vui lòng nhập số điện thoại.";
     if (!userForm.RoleId) return "Vui lòng chọn vai trò.";
     return "";
@@ -415,13 +447,19 @@ export default function OwnerStaffManagement() {
   const buildUserFormData = () => {
     const formData = new FormData();
 
+    const fullAddress = buildFullAddress(
+      userForm.StreetAddress,
+      userForm.CityCode,
+      userForm.WardCode,
+    );
+
     formData.append("UserName", userForm.UserName.trim());
     if (userForm.Password.trim()) {
       formData.append("Password", userForm.Password.trim());
     }
     formData.append("FullName", userForm.FullName.trim());
     formData.append("Email", userForm.Email.trim());
-    formData.append("Address", userForm.Address.trim());
+    formData.append("Address", fullAddress);
     formData.append("Phone", userForm.Phone.trim());
     formData.append("RoleId", String(Number(userForm.RoleId)));
 
@@ -435,7 +473,6 @@ export default function OwnerStaffManagement() {
 
     return formData;
   };
-
   const handleSubmitUser = async (e) => {
     e.preventDefault();
 
@@ -1072,20 +1109,75 @@ export default function OwnerStaffManagement() {
               </FormField>
             </div>
 
-            <FormField label="Address" required>
-              <input
-                type="text"
-                value={userForm.Address}
-                onChange={(e) =>
-                  setUserForm((prev) => ({
-                    ...prev,
-                    Address: e.target.value,
-                  }))
-                }
-                className={inputClass}
-                placeholder="123 Nguyen Trai"
-              />
-            </FormField>
+            <div className="grid grid-cols-1 gap-5">
+              <FormField label="Số nhà, tên đường" required>
+                <input
+                  type="text"
+                  value={userForm.StreetAddress}
+                  onChange={(e) =>
+                    setUserForm((prev) => ({
+                      ...prev,
+                      StreetAddress: e.target.value,
+                    }))
+                  }
+                  className={inputClass}
+                  placeholder="123 Nguyễn Trãi"
+                />
+              </FormField>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <FormField label="Tỉnh / Thành" required>
+                  <select
+                    value={userForm.CityCode}
+                    onChange={(e) =>
+                      setUserForm((prev) => ({
+                        ...prev,
+                        CityCode: e.target.value,
+                        WardCode: "",
+                      }))
+                    }
+                    className={inputClass}
+                  >
+                    <option value="">Chọn tỉnh / thành</option>
+                    {cities.map((city) => (
+                      <option key={city.code} value={city.code}>
+                        {city.fullName || city.name}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+
+                <FormField label="Phường / Xã" required>
+                  <select
+                    value={userForm.WardCode}
+                    onChange={(e) =>
+                      setUserForm((prev) => ({
+                        ...prev,
+                        WardCode: e.target.value,
+                      }))
+                    }
+                    className={inputClass}
+                    disabled={!userForm.CityCode}
+                  >
+                    <option value="">Chọn phường / xã</option>
+                    {wardOptions.map((ward) => (
+                      <option key={ward.code} value={ward.code}>
+                        {ward.fullName || ward.name}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+              </div>
+
+              <div className="rounded-xl border border-[#DCE6F7] bg-[#F7F9FC] px-4 py-3">
+                <div className="text-xs font-medium text-[#8DA1C1]">
+                  Địa chỉ hoàn chỉnh
+                </div>
+                <div className="mt-1 text-sm text-[#2F3A67]">
+                  {previewAddress || "Chưa chọn đầy đủ địa chỉ"}
+                </div>
+              </div>
+            </div>
 
             <ModalActions
               submitting={submittingUser}
@@ -1640,3 +1732,61 @@ const inputClass =
 
 const fileInputClass =
   "w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none file:mr-4 file:rounded-lg file:border-0 file:bg-[#EEF2FF] file:px-3 file:py-2 file:text-sm file:font-medium file:text-[#2F3A67]";
+function buildFullAddress(streetAddress, cityCode, wardCode) {
+  const city = cities.find((item) => String(item.code) === String(cityCode));
+  const ward = city?.wards?.find(
+    (item) => String(item.code) === String(wardCode),
+  );
+
+  return [streetAddress?.trim(), ward?.name, city?.name]
+    .filter(Boolean)
+    .join(", ");
+}
+
+function parseAddressToForm(address) {
+  const raw = String(address || "").trim();
+  if (!raw) {
+    return {
+      StreetAddress: "",
+      CityCode: "",
+      WardCode: "",
+      Address: "",
+    };
+  }
+
+  const matchedCity = cities.find((city) =>
+    raw.toLowerCase().includes(String(city.name || "").toLowerCase()),
+  );
+
+  const matchedWard = matchedCity?.wards?.find((ward) =>
+    raw.toLowerCase().includes(String(ward.name || "").toLowerCase()),
+  );
+
+  let streetAddress = raw;
+
+  if (matchedWard?.name) {
+    streetAddress = streetAddress.replace(
+      new RegExp(matchedWard.name, "i"),
+      "",
+    );
+  }
+
+  if (matchedCity?.name) {
+    streetAddress = streetAddress.replace(
+      new RegExp(matchedCity.name, "i"),
+      "",
+    );
+  }
+
+  streetAddress = streetAddress
+    .replace(/,\s*,/g, ",")
+    .replace(/^,\s*|\s*,$/g, "")
+    .trim();
+
+  return {
+    StreetAddress: streetAddress,
+    CityCode: matchedCity?.code ? String(matchedCity.code) : "",
+    WardCode: matchedWard?.code ? String(matchedWard.code) : "",
+    Address: raw,
+  };
+}

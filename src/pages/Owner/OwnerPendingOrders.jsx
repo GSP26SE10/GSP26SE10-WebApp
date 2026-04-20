@@ -17,6 +17,7 @@ import {
   MessageCircle,
   ChevronDown,
   AlertTriangle,
+  UtensilsCrossed,
 } from "lucide-react";
 
 const ORDER_STATUS_MAP = {
@@ -484,14 +485,6 @@ export default function OwnerPendingOrder() {
                     Đơn đang chờ duyệt
                   </h2>
                 </div>
-
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-2 rounded-xl border border-[#D6DFEF] bg-white px-4 py-2 text-sm font-medium text-[#8DA1C1] hover:bg-gray-50"
-                >
-                  <Filter className="h-4 w-4" />
-                  Lọc
-                </button>
               </div>
 
               <div className="flex-1 min-h-0 overflow-y-auto hide-scrollbar space-y-3 pr-1">
@@ -656,6 +649,24 @@ function OrderDetailPanel({
   const menuDishes = Array.isArray(menuSnapshot?.dishes)
     ? menuSnapshot.dishes
     : [];
+  const extraDishes = Array.isArray(detail?.customDishSnapshot?.customDishes)
+    ? detail.customDishSnapshot.customDishes
+    : Array.isArray(detail?.extraDishes)
+      ? detail.extraDishes
+      : Array.isArray(detail?.customDishes)
+        ? detail.customDishes
+        : Array.isArray(detail?.additionalDishes)
+          ? detail.additionalDishes
+          : [];
+
+  const customDishTotal = Array.isArray(
+    detail?.customDishSnapshot?.customDishes,
+  )
+    ? detail.customDishSnapshot.customDishes.reduce(
+        (sum, d) => sum + Number(d.totalAmount || 0),
+        0,
+      )
+    : 0;
   const menuBasePrice = Number(menuSnapshot?.basePrice || 0);
   const serviceTotal = Array.isArray(serviceSnapshot?.services)
     ? serviceSnapshot.services.reduce(
@@ -939,7 +950,46 @@ function OrderDetailPanel({
               </div>
             ) : null}
           </div>
+          {Number(detail?.type) === 2 ? (
+            <div className="rounded-[24px] border border-[#ECEFF5] bg-white p-5">
+              <div className="mt-1 text-lg font-semibold text-[#2F3A67] mb-4">
+                Món lẻ khách gọi thêm
+              </div>
 
+              {extraDishes.length > 0 ? (
+                <div className="space-y-3">
+                  {extraDishes.map((dish, index) => (
+                    <div
+                      key={dish.dishId || dish.id || index}
+                      className="flex items-center gap-3 rounded-xl bg-[#F8F5F1] px-4 py-3"
+                    >
+                      <div className="h-10 w-10 rounded-full bg-[#FFF1E8] flex items-center justify-center text-[#E8712E] overflow-hidden">
+                        {dish.img ? (
+                          <img
+                            src={dish.img}
+                            alt={dish.dishName || "dish"}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <UtensilsCrossed className="h-4 w-4" />
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-[#2B2B2B]">
+                          {dish.dishName || dish.name || "Món lẻ"}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">
+                  Chưa có món lẻ gọi thêm.
+                </div>
+              )}
+            </div>
+          ) : null}
           <div className="rounded-[24px] border border-[#ECEFF5] bg-white p-5">
             <div className="mt-1 text-lg font-semibold text-[#2F3A67] mb-4">
               Dịch vụ đi kèm
@@ -1073,9 +1123,6 @@ function OrderDetailPanel({
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
             <div className="text-lg font-semibold text-[#2F3A67] mb-2">
               Lý do từ chối
-            </div>
-            <div className="text-sm text-[#8DA1C1] mb-4">
-              Lý do sẽ được lưu vào ghi chú đơn hàng và gửi cho khách hàng.
             </div>
 
             <textarea

@@ -2,7 +2,7 @@ import React from "react";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import API_URL from "@/config/api";
-import { MessageSquareMore, Star, Image as ImageIcon, X } from "lucide-react";
+import { Star, Image as ImageIcon, X, Bot } from "lucide-react";
 import { toast } from "sonner";
 
 const FEEDBACK_MENU_ENDPOINT = `${API_URL}/api/feedback-menu`;
@@ -28,6 +28,10 @@ export default function OwnerFeedback() {
 
   const [openDetailModal, setOpenDetailModal] = React.useState(false);
   const [selectedGroup, setSelectedGroup] = React.useState(null);
+
+  const [previewImages, setPreviewImages] = React.useState([]);
+  const [previewIndex, setPreviewIndex] = React.useState(0);
+  const [openImageViewer, setOpenImageViewer] = React.useState(false);
 
   const fetchAllPages = React.useCallback(async (baseUrl) => {
     let page = 1;
@@ -118,6 +122,7 @@ export default function OwnerFeedback() {
           name: fb.menuName || menu?.menuName || `Menu #${key}`,
           image: getEntityImage(menu),
           feedbacks: [],
+          aiSummary: "",
           averageRating: 0,
           totalFeedbacks: 0,
         });
@@ -137,8 +142,16 @@ export default function OwnerFeedback() {
               ) / total
             : 0;
 
+        const aiSummary =
+          group.feedbacks.find(
+            (item) =>
+              typeof item.aisMenuSummary === "string" &&
+              item.aisMenuSummary.trim(),
+          )?.aisMenuSummary || "";
+
         return {
           ...group,
+          aiSummary,
           averageRating: avg,
           totalFeedbacks: total,
           feedbacks: [...group.feedbacks].sort(
@@ -154,6 +167,7 @@ export default function OwnerFeedback() {
 
     for (const fb of serviceFeedbacks) {
       const key = Number(fb.serviceId);
+
       if (!groups.has(key)) {
         const service = serviceMap.get(key);
 
@@ -163,6 +177,7 @@ export default function OwnerFeedback() {
           name: fb.serviceName || service?.serviceName || `Dịch vụ #${key}`,
           image: getEntityImage(service),
           feedbacks: [],
+          aiSummary: "",
           averageRating: 0,
           totalFeedbacks: 0,
         });
@@ -182,8 +197,16 @@ export default function OwnerFeedback() {
               ) / total
             : 0;
 
+        const aiSummary =
+          group.feedbacks.find(
+            (item) =>
+              typeof item.aisServiceSummary === "string" &&
+              item.aisServiceSummary.trim(),
+          )?.aisServiceSummary || "";
+
         return {
           ...group,
+          aiSummary,
           averageRating: avg,
           totalFeedbacks: total,
           feedbacks: [...group.feedbacks].sort(
@@ -203,6 +226,7 @@ export default function OwnerFeedback() {
     return source.filter((item) => {
       return (
         item.name?.toLowerCase().includes(keyword) ||
+        item.aisMenuSummary?.toLowerCase().includes(keyword) ||
         item.feedbacks.some(
           (fb) =>
             fb.customerName?.toLowerCase().includes(keyword) ||
@@ -220,6 +244,30 @@ export default function OwnerFeedback() {
   const closeDetail = () => {
     setSelectedGroup(null);
     setOpenDetailModal(false);
+  };
+
+  const handleOpenImageViewer = (images, index = 0) => {
+    setPreviewImages(Array.isArray(images) ? images : []);
+    setPreviewIndex(index);
+    setOpenImageViewer(true);
+  };
+
+  const closeImageViewer = () => {
+    setPreviewImages([]);
+    setPreviewIndex(0);
+    setOpenImageViewer(false);
+  };
+
+  const showPrevImage = () => {
+    setPreviewIndex((prev) =>
+      prev === 0 ? previewImages.length - 1 : prev - 1,
+    );
+  };
+
+  const showNextImage = () => {
+    setPreviewIndex((prev) =>
+      prev === previewImages.length - 1 ? 0 : prev + 1,
+    );
   };
 
   return (
@@ -315,13 +363,14 @@ export default function OwnerFeedback() {
 
       {openDetailModal && selectedGroup && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 p-4">
-          <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-xl">
             <div className="flex items-center justify-between border-b px-6 py-4">
               <div className="min-w-0">
                 <h2 className="text-lg font-bold text-gray-900">
                   {selectedGroup.name}
                 </h2>
-                <div className="mt-1 flex items-center gap-4 text-sm text-gray-500">
+
+                <div className="mt-1 flex flex-wrap items-center gap-4 text-sm text-gray-500">
                   <span>
                     Đánh giá trung bình:{" "}
                     <span
@@ -348,16 +397,78 @@ export default function OwnerFeedback() {
             </div>
 
             <div className="hide-scrollbar max-h-[calc(90vh-76px)] overflow-y-auto p-6">
+              {selectedGroup.aiSummary && (
+                <div className="mb-6 rounded-2xl border border-orange-200 bg-orange-50 p-4">
+                  <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-orange-700">
+                    <div className="h-4 " />
+                    AI đánh giá{" "}
+                    {selectedGroup.type === "menu" ? "menu" : "dịch vụ"}
+                  </div>
+                  <div className="text-sm leading-6 text-orange-900">
+                    {selectedGroup.aiSummary}
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-4">
                 {selectedGroup.feedbacks.map((fb) => (
                   <FeedbackDetailCard
                     key={getDetailFeedbackKey(fb, selectedGroup.type)}
                     item={fb}
                     type={selectedGroup.type}
+                    onPreviewImages={handleOpenImageViewer}
                   />
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {openImageViewer && previewImages.length > 0 && (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/80 p-4">
+          <div className="relative w-full max-w-4xl">
+            <button
+              type="button"
+              onClick={closeImageViewer}
+              className="absolute right-2 top-2 z-10 rounded-full bg-white/90 p-2 shadow hover:bg-white"
+            >
+              <X className="h-5 w-5 text-gray-700" />
+            </button>
+
+            {previewImages.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={showPrevImage}
+                  className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/90 px-3 py-2 text-lg font-bold shadow hover:bg-white"
+                >
+                  ‹
+                </button>
+
+                <button
+                  type="button"
+                  onClick={showNextImage}
+                  className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/90 px-3 py-2 text-lg font-bold shadow hover:bg-white"
+                >
+                  ›
+                </button>
+              </>
+            )}
+
+            <div className="overflow-hidden rounded-2xl bg-white p-3 shadow-2xl">
+              <img
+                src={previewImages[previewIndex]}
+                alt={`preview-${previewIndex + 1}`}
+                className="max-h-[80vh] w-full rounded-xl object-contain"
+              />
+            </div>
+
+            {previewImages.length > 1 && (
+              <div className="mt-3 text-center text-sm text-white">
+                {previewIndex + 1}/{previewImages.length}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -367,6 +478,7 @@ export default function OwnerFeedback() {
 
 function FeedbackSummaryCard({ group, onClick }) {
   const isBad = group.averageRating < 2;
+  const hasaiSummary = !!group.aiSummary;
 
   return (
     <button
@@ -391,7 +503,9 @@ function FeedbackSummaryCard({ group, onClick }) {
           ) : (
             <div className="flex h-full w-full items-center justify-center">
               <ImageIcon
-                className={`h-8 w-8 ${isBad ? "text-red-500" : "text-[#E8712E]"}`}
+                className={`h-8 w-8 ${
+                  isBad ? "text-red-500" : "text-[#E8712E]"
+                }`}
               />
             </div>
           )}
@@ -429,6 +543,13 @@ function FeedbackSummaryCard({ group, onClick }) {
         </div>
       </div>
 
+      {hasaiSummary && (
+        <div className="mb-4 rounded-xl bg-orange-50 px-3 py-2 text-sm text-orange-800">
+          <span className="font-semibold">AI tóm tắt đánh giá</span>{" "}
+          <span className="line-clamp-2">{group.aiSummary}</span>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div
           className={`rounded-full px-3 py-1 text-xs font-semibold ${
@@ -450,7 +571,11 @@ function FeedbackSummaryCard({ group, onClick }) {
   );
 }
 
-function FeedbackDetailCard({ item, type }) {
+function FeedbackDetailCard({ item, type, onPreviewImages }) {
+  const rating = Number(item.rating || 0);
+  const images = normalizeImageList(item.img);
+  const isBad = rating <= 2;
+
   return (
     <div className="rounded-2xl border border-[#F1E3D8] bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-4">
@@ -458,9 +583,10 @@ function FeedbackDetailCard({ item, type }) {
           <div className="text-sm font-semibold text-gray-900">
             {item.customerName || "Ẩn danh"}
           </div>
+
           <div className="mt-1 flex items-center gap-1">
             {Array.from({ length: 5 }).map((_, index) => {
-              const filled = index < Number(item.rating || 0);
+              const filled = index < rating;
               return (
                 <Star
                   key={index}
@@ -471,7 +597,7 @@ function FeedbackDetailCard({ item, type }) {
               );
             })}
             <span className="ml-2 text-sm font-medium text-gray-600">
-              {Number(item.rating || 0)}/5
+              {rating}/5
             </span>
           </div>
         </div>
@@ -481,16 +607,45 @@ function FeedbackDetailCard({ item, type }) {
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl bg-[#FFF9F4] px-4 py-3 text-sm leading-6 text-gray-700">
+      <div
+        className={`mt-4 rounded-xl px-4 py-3 text-sm leading-6 ${
+          isBad ? "bg-red-50 text-red-700" : "bg-[#FFF9F4] text-gray-700"
+        }`}
+      >
         {item.comment || "Không có nội dung feedback"}
       </div>
+
+      {images.length > 0 && (
+        <div className="mt-3">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Ảnh khách hàng gửi
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {images.map((url, idx) => (
+              <button
+                key={`${url}-${idx}`}
+                type="button"
+                onClick={() => onPreviewImages(images, idx)}
+                className="overflow-hidden rounded-xl border border-[#F1E3D8] bg-white"
+              >
+                <img
+                  src={url}
+                  alt={`feedback-${idx + 1}`}
+                  className="h-24 w-24 object-cover transition hover:scale-105"
+                />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-3 flex items-center justify-between text-xs text-gray-400">
         <span>Mã đơn: #{item.orderId}</span>
         <span>
           {type === "menu"
             ? `OrderDetail #${item.orderDetailId}`
-            : `OrderDetail #${item.orderDetailId}`}
+            : `BookingDetail #${item.bookingDetailId || item.orderDetailId || "—"}`}
         </span>
       </div>
     </div>
@@ -528,6 +683,22 @@ function getEntityImage(entity) {
   }
 
   return "";
+}
+
+function normalizeImageList(value) {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => typeof item === "string" && item.trim())
+      .map((item) => normalizeImageUrl(item));
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    return [normalizeImageUrl(value)];
+  }
+
+  return [];
 }
 
 function normalizeImageUrl(url) {
