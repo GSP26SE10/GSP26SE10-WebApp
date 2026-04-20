@@ -27,6 +27,7 @@ import OwnerTaskTemplate from "./pages/Owner/OwnerTaskTemplate";
 import OwnerExtraChargeCatalog from "./pages/Owner/OwnerExtraChargeCatalog";
 import OwnerContactRequest from "./pages/Owner/OwnerContactRequest";
 import OwnerMenuCategory from "./pages/Owner/OwnerMenuCategory";
+import useAutoLogout from "./utils/useAutoLogout";
 function RequireAuth({ children }) {
   const token =
     localStorage.getItem("accessToken") ||
@@ -39,41 +40,46 @@ function RequireAuth({ children }) {
   return children ?? <Outlet />;
 }
 
+function AppContent() {
+  useAutoLogout();
+
+  return (
+    <main>
+      <Routes>
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/login" element={<LoginPage />} />
+
+        <Route path="/owner" element={<RequireAuth />}>
+          <Route path="dashboard" element={<OwnerDashboard />} />
+          <Route path="menu" element={<OwnerMenu />} />
+          <Route path="dish" element={<OwnerDish />} />
+          <Route path="dish-category" element={<OwnerDishCategory />} />
+          <Route path="service" element={<OwnerService />} />
+          <Route path="orders/pending" element={<OwnerPendingOrders />} />
+          <Route path="orders/tracking" element={<OwnerTrackingOrder />} />
+          <Route path="party-category" element={<OwnerPartyCategory />} />
+          <Route path="ingredient" element={<OwnerIngredient />} />
+          <Route path="staff" element={<OwnerStaffManagement />} />
+          <Route path="staff-schedule" element={<OwnerStaffSchedule />} />
+          <Route path="account" element={<OwnerAccountPage />} />
+          <Route path="blog" element={<OwnerBlog />} />
+          <Route path="feedback" element={<OwnerFeedback />} />
+          <Route path="task-template" element={<OwnerTaskTemplate />} />
+          <Route path="contact-request" element={<OwnerContactRequest />} />
+          <Route path="menu-category" element={<OwnerMenuCategory />} />
+          <Route path="extra-charge" element={<OwnerExtraChargeCatalog />} />
+        </Route>
+      </Routes>
+
+      <Toaster />
+    </main>
+  );
+}
+
 export default function App() {
   return (
     <Router>
-      <div>
-        <main>
-          <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/owner" element={<RequireAuth />}>
-              <Route path="dashboard" element={<OwnerDashboard />} />
-              <Route path="menu" element={<OwnerMenu />} />
-              <Route path="dish" element={<OwnerDish />} />
-              <Route path="dish-category" element={<OwnerDishCategory />} />
-              <Route path="service" element={<OwnerService />} />
-              <Route path="orders/pending" element={<OwnerPendingOrders />} />
-              <Route path="orders/tracking" element={<OwnerTrackingOrder />} />
-              <Route path="party-category" element={<OwnerPartyCategory />} />
-              <Route path="ingredient" element={<OwnerIngredient />} />
-              <Route path="staff" element={<OwnerStaffManagement />} />
-              <Route path="staff-schedule" element={<OwnerStaffSchedule />} />
-              <Route path="account" element={<OwnerAccountPage />} />
-              <Route path="blog" element={<OwnerBlog />} />
-              <Route path="feedback" element={<OwnerFeedback />} />
-              <Route path="task-template" element={<OwnerTaskTemplate />} />
-              <Route path="contact-request" element={<OwnerContactRequest />} />
-              <Route path="menu-category" element={<OwnerMenuCategory />} />
-              <Route
-                path="extra-charge"
-                element={<OwnerExtraChargeCatalog />}
-              />
-            </Route>
-          </Routes>
-          <Toaster />
-        </main>
-      </div>
+      <AppContent />
     </Router>
   );
 }
