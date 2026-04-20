@@ -710,15 +710,21 @@ function PartyCategoryModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <FormField label="Ảnh">
               <div className="space-y-3">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={onImageChange}
-                  className="block w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none file:mr-3 file:rounded-lg file:border-0 file:bg-[#EEF2FF] file:px-3 file:py-2 file:text-sm file:font-medium file:text-[#2F3A67]"
-                />
+                <div className="space-y-3">
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm font-medium text-[#2F3A67] hover:bg-[#F7F9FC]">
+                    <ImageIcon className="h-4 w-4" />
+                    Chọn ảnh
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={onImageChange}
+                      className="hidden"
+                    />
+                  </label>
 
-                <div className="text-xs text-[#8DA1C1]">
-                  Có thể để trống nếu chưa muốn thêm ảnh.
+                  <div className="text-xs text-[#8DA1C1]">
+                    Có thể để trống nếu chưa muốn thêm ảnh.
+                  </div>
                 </div>
               </div>
             </FormField>

@@ -10,10 +10,18 @@ import {
   Mail,
   Phone,
   MapPin,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 
 const USER_ENDPOINT = `${API_URL}/api/user`;
+
+const ROLE_NAME_TO_ID = {
+  ADMIN: 0,
+  GROUP_LEADER: 1,
+  STAFF: 2,
+  USER: 3,
+};
 
 function parseJwt(token) {
   try {
@@ -61,6 +69,19 @@ function getCurrentAuthUser() {
   };
 }
 
+function getRoleId(user) {
+  if (user?.roleId !== undefined && user?.roleId !== null) {
+    return Number(user.roleId);
+  }
+
+  const roleName = String(user?.roleName || "").toUpperCase();
+  if (roleName in ROLE_NAME_TO_ID) {
+    return ROLE_NAME_TO_ID[roleName];
+  }
+
+  return 0;
+}
+
 export default function OwnerAccountPage() {
   const [sbExpanded, setSbExpanded] = React.useState(false);
 
@@ -78,6 +99,7 @@ export default function OwnerAccountPage() {
     phone: "",
     address: "",
     avatar: "",
+    avatarFile: null,
   });
 
   const fetchAllUsers = React.useCallback(async () => {
@@ -113,7 +135,6 @@ export default function OwnerAccountPage() {
       }
 
       const authUser = getCurrentAuthUser();
-
       let currentUser = null;
 
       if (authUser?.userId) {
@@ -142,14 +163,20 @@ export default function OwnerAccountPage() {
         throw new Error("Không tìm thấy thông tin tài khoản đang đăng nhập.");
       }
 
-      setProfile(currentUser);
+      const normalizedUser = {
+        ...currentUser,
+        roleId: getRoleId(currentUser),
+      };
+
+      setProfile(normalizedUser);
       setForm({
-        userName: currentUser.userName || "",
-        fullName: currentUser.fullName || "",
-        email: currentUser.email || "",
-        phone: currentUser.phone || "",
-        address: currentUser.address || "",
-        avatar: currentUser.avatar || "",
+        userName: normalizedUser.userName || "",
+        fullName: normalizedUser.fullName || "",
+        email: normalizedUser.email || "",
+        phone: normalizedUser.phone || "",
+        address: normalizedUser.address || "",
+        avatar: normalizedUser.avatar || "",
+        avatarFile: null,
       });
     } catch (err) {
       const message = err.message || "Đã có lỗi xảy ra";
@@ -174,12 +201,27 @@ export default function OwnerAccountPage() {
       phone: profile.phone || "",
       address: profile.address || "",
       avatar: profile.avatar || "",
+      avatarFile: null,
     });
   };
 
   const handleCancelEdit = () => {
     resetForm();
     setEditing(false);
+  };
+
+  const handleChangeField = (key, value) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleAvatarFileChange = (e) => {
+    const file = e.target.files?.[0] || null;
+
+    setForm((prev) => ({
+      ...prev,
+      avatarFile: file,
+      avatar: file ? URL.createObjectURL(file) : profile?.avatar || "",
+    }));
   };
 
   const handleUpdateProfile = async (e) => {
@@ -189,32 +231,42 @@ export default function OwnerAccountPage() {
     setSubmitting(true);
 
     try {
-      const payload = {
-        userName: form.userName.trim(),
-        fullName: form.fullName.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-        address: form.address.trim(),
-        avatar: form.avatar.trim(),
-        status: profile.status,
-        roleName: profile.roleName,
-      };
+      const userName = form.userName.trim();
+      const fullName = form.fullName.trim();
+      const email = form.email.trim();
+      const phone = form.phone.trim();
+      const address = form.address.trim();
 
-      if (!payload.fullName) {
+      if (!userName) {
+        throw new Error("Vui lòng nhập tên đăng nhập.");
+      }
+
+      if (!fullName) {
         throw new Error("Vui lòng nhập họ và tên.");
       }
 
-      if (!payload.email) {
+      if (!email) {
         throw new Error("Vui lòng nhập email.");
+      }
+
+      const formData = new FormData();
+      formData.append("userName", userName);
+      formData.append("fullName", fullName);
+      formData.append("email", email);
+      formData.append("phone", phone);
+      formData.append("address", address);
+      formData.append("roleId", String(profile.roleId ?? 0));
+
+      if (form.avatarFile) {
+        formData.append("avatarFile", form.avatarFile);
       }
 
       const res = await fetch(`${USER_ENDPOINT}/${profile.userId}`, {
         method: "PUT",
         headers: {
           accept: "*/*",
-          "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        body: formData,
       });
 
       const data = await res.json().catch(() => ({}));
@@ -252,7 +304,7 @@ export default function OwnerAccountPage() {
           }
           userName={profile?.fullName || profile?.userName || "Người dùng"}
           userEmail={profile?.email || ""}
-          avatarSrc={profile?.avatar || ""}
+          avatarSrc={form?.avatar || profile?.avatar || ""}
         />
 
         <main className="px-7 py-6 pb-10">
@@ -334,17 +386,14 @@ export default function OwnerAccountPage() {
                     <Field
                       label="Tên đăng nhập"
                       value={form.userName}
-                      onChange={(v) =>
-                        setForm((prev) => ({ ...prev, userName: v }))
-                      }
+                      onChange={(v) => handleChangeField("userName", v)}
+                      required
                       disabled={!editing}
                     />
                     <Field
                       label="Họ và tên"
                       value={form.fullName}
-                      onChange={(v) =>
-                        setForm((prev) => ({ ...prev, fullName: v }))
-                      }
+                      onChange={(v) => handleChangeField("fullName", v)}
                       required
                       disabled={!editing}
                     />
@@ -355,18 +404,14 @@ export default function OwnerAccountPage() {
                       label="Email"
                       type="email"
                       value={form.email}
-                      onChange={(v) =>
-                        setForm((prev) => ({ ...prev, email: v }))
-                      }
+                      onChange={(v) => handleChangeField("email", v)}
                       required
                       disabled={!editing}
                     />
                     <Field
                       label="Số điện thoại"
                       value={form.phone}
-                      onChange={(v) =>
-                        setForm((prev) => ({ ...prev, phone: v }))
-                      }
+                      onChange={(v) => handleChangeField("phone", v)}
                       disabled={!editing}
                     />
                   </div>
@@ -374,20 +419,55 @@ export default function OwnerAccountPage() {
                   <Field
                     label="Địa chỉ"
                     value={form.address}
-                    onChange={(v) =>
-                      setForm((prev) => ({ ...prev, address: v }))
-                    }
+                    onChange={(v) => handleChangeField("address", v)}
                     disabled={!editing}
                   />
 
-                  <Field
-                    label="Avatar URL"
-                    value={form.avatar}
-                    onChange={(v) =>
-                      setForm((prev) => ({ ...prev, avatar: v }))
-                    }
-                    disabled={!editing}
-                  />
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      Ảnh đại diện
+                    </label>
+
+                    <div className="flex items-center gap-3">
+                      <label
+                        className={`flex h-11 cursor-pointer items-center gap-2 rounded-lg border px-4 transition ${
+                          editing
+                            ? "border-gray-300 bg-white hover:bg-gray-50"
+                            : "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-400"
+                        }`}
+                      >
+                        <Upload className="h-4 w-4" />
+                        <span>
+                          {form.avatarFile ? form.avatarFile.name : "Chọn ảnh"}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={!editing}
+                          onChange={handleAvatarFileChange}
+                          className="hidden"
+                        />
+                      </label>
+
+                      {form.avatarFile && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              avatarFile: null,
+                              avatar: profile?.avatar || "",
+                            }))
+                          }
+                          className="text-sm text-red-500 hover:underline"
+                          disabled={!editing}
+                        >
+                          Xóa ảnh mới chọn
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   {editing && (
                     <div className="flex justify-end gap-3 pt-3">
                       <button
@@ -455,23 +535,4 @@ function Field({
       />
     </div>
   );
-}
-
-function ReadonlyField({ label, value }) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-gray-700">
-        {label}
-      </label>
-      <div className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-gray-600">
-        {value || "—"}
-      </div>
-    </div>
-  );
-}
-
-function renderStatus(status) {
-  if (status === 1 || String(status) === "1") return "Hoạt động";
-  if (status === 0 || String(status) === "0") return "Ngưng hoạt động";
-  return String(status ?? "—");
 }

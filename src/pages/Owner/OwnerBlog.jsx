@@ -27,14 +27,12 @@ const PAGE_SIZE = 8;
 const POST_STATUS_OPTIONS = [
   { value: "Draft", label: "Bản nháp", apiValue: 0 },
   { value: "Published", label: "Đã xuất bản", apiValue: 1 },
-  { value: "Archived", label: "Lưu trữ", apiValue: 2 },
 ];
 
 const BLOCK_TYPES = {
   1: { label: "Tiêu đề lớn", icon: Heading1 },
   2: { label: "Tiêu đề nhỏ", icon: Heading2 },
   3: { label: "Đoạn văn", icon: AlignLeft },
-  4: { label: "Hình ảnh", icon: ImageIcon },
   5: { label: "Trích dẫn", icon: Quote },
 };
 
@@ -133,9 +131,9 @@ export default function OwnerBlog() {
 
   const [selectedPost, setSelectedPost] = React.useState(null);
   const [postForm, setPostForm] = React.useState(EMPTY_POST_FORM);
-  const [coverImageFiles, setCoverImageFiles] = React.useState([]);
-  const [coverImagePreviews, setCoverImagePreviews] = React.useState([]);
-  const [existingCoverImages, setExistingCoverImages] = React.useState([]);
+  const [coverImageFile, setCoverImageFile] = React.useState(null);
+  const [coverImagePreview, setCoverImagePreview] = React.useState("");
+  const [existingCoverImage, setExistingCoverImage] = React.useState("");
   const [categoryForm, setCategoryForm] = React.useState(EMPTY_CATEGORY_FORM);
   const [blocks, setBlocks] = React.useState([createEmptyBlock(1, 1)]);
 
@@ -155,9 +153,14 @@ export default function OwnerBlog() {
 
   React.useEffect(() => {
     return () => {
-      revokePreviewUrls(coverImagePreviews);
+      if (
+        typeof coverImagePreview === "string" &&
+        coverImagePreview.startsWith("blob:")
+      ) {
+        URL.revokeObjectURL(coverImagePreview);
+      }
     };
-  }, [coverImagePreviews, revokePreviewUrls]);
+  }, [coverImagePreview]);
 
   const fetchJson = React.useCallback(async (url, options = {}) => {
     const res = await fetch(url, {
@@ -364,15 +367,21 @@ export default function OwnerBlog() {
   );
 
   const resetPostForm = React.useCallback(() => {
-    revokePreviewUrls(coverImagePreviews);
+    if (
+      typeof coverImagePreview === "string" &&
+      coverImagePreview.startsWith("blob:")
+    ) {
+      URL.revokeObjectURL(coverImagePreview);
+    }
+
     setSelectedPost(null);
     setPostForm(EMPTY_POST_FORM);
-    setCoverImageFiles([]);
-    setCoverImagePreviews([]);
-    setExistingCoverImages([]);
+    setCoverImageFile(null);
+    setCoverImagePreview("");
+    setExistingCoverImage("");
     setBlocks([createEmptyBlock(1, 1)]);
     setAutoPostSlug(true);
-  }, [coverImagePreviews, revokePreviewUrls]);
+  }, [coverImagePreview]);
 
   const resetCategoryForm = React.useCallback(() => {
     setCategoryForm(EMPTY_CATEGORY_FORM);
@@ -401,18 +410,25 @@ export default function OwnerBlog() {
         blogCategoryId: String(post.blogCategoryId || ""),
       });
       setAutoPostSlug(false);
-      revokePreviewUrls(coverImagePreviews);
-      setCoverImageFiles([]);
-      setCoverImagePreviews([]);
-      setExistingCoverImages(
-        normalizeImageUrls(
-          post.coverImageFiles ||
-            post.coverImages ||
-            post.coverImage ||
-            post.imgUrl ||
-            post.imageUrls,
-        ),
+      if (
+        typeof coverImagePreview === "string" &&
+        coverImagePreview.startsWith("blob:")
+      ) {
+        URL.revokeObjectURL(coverImagePreview);
+      }
+
+      setCoverImageFile(null);
+      setCoverImagePreview("");
+
+      const normalizedCover = normalizeImageUrls(
+        post.coverImageFiles ||
+          post.coverImages ||
+          post.coverImage ||
+          post.imgUrl ||
+          post.imageUrls,
       );
+
+      setExistingCoverImage(normalizedCover[0] || "");
       setBlocks(
         blockItems.length > 0
           ? blockItems.map((item) => ({
@@ -572,9 +588,9 @@ export default function OwnerBlog() {
     formData.append("Status", String(payload.status));
     formData.append("BlogCategoryId", String(payload.blogCategoryId));
 
-    coverImageFiles.forEach((file) => {
-      formData.append("CoverImageFiles", file);
-    });
+    if (coverImageFile) {
+      formData.append("CoverImageFiles", coverImageFile);
+    }
 
     const res = await fetch(url, {
       method: isEdit ? "PUT" : "POST",
@@ -918,12 +934,12 @@ export default function OwnerBlog() {
           selectedPost={selectedPost}
           form={postForm}
           setForm={setPostForm}
-          coverImageFiles={coverImageFiles}
-          setCoverImageFiles={setCoverImageFiles}
-          coverImagePreviews={coverImagePreviews}
-          setCoverImagePreviews={setCoverImagePreviews}
-          existingCoverImages={existingCoverImages}
-          setExistingCoverImages={setExistingCoverImages}
+          coverImageFile={coverImageFile}
+          setCoverImageFile={setCoverImageFile}
+          coverImagePreview={coverImagePreview}
+          setCoverImagePreview={setCoverImagePreview}
+          existingCoverImage={existingCoverImage}
+          setExistingCoverImage={setExistingCoverImage}
           blocks={blocks}
           categories={categories}
           autoSlug={autoPostSlug}
@@ -1045,12 +1061,12 @@ function PostModal({
   selectedPost,
   form,
   setForm,
-  coverImageFiles,
-  setCoverImageFiles,
-  coverImagePreviews,
-  setCoverImagePreviews,
-  existingCoverImages,
-  setExistingCoverImages,
+  coverImageFile,
+  setCoverImageFile,
+  coverImagePreview,
+  setCoverImagePreview,
+  existingCoverImage,
+  setExistingCoverImage,
   blocks,
   categories,
   autoSlug,
@@ -1064,51 +1080,38 @@ function PostModal({
   removeBlock,
   moveBlock,
   uploadImageFile,
-  revokePreviewUrls,
   deleteButton,
 }) {
-  const allCoverPreviewImages = [
-    ...existingCoverImages.map((src) => ({ src, type: "existing" })),
-    ...coverImagePreviews.map((src) => ({ src, type: "new" })),
-  ];
+  const displayCoverImage = coverImagePreview || existingCoverImage || "";
 
   const handleCoverImageChange = (e) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    const nextFiles = files.filter(
-      (file) =>
-        !coverImageFiles.some(
-          (existing) =>
-            existing.name === file.name &&
-            existing.size === file.size &&
-            existing.lastModified === file.lastModified,
-        ),
-    );
-
-    if (nextFiles.length === 0) {
-      e.target.value = "";
-      return;
+    if (
+      typeof coverImagePreview === "string" &&
+      coverImagePreview.startsWith("blob:")
+    ) {
+      URL.revokeObjectURL(coverImagePreview);
     }
 
-    const nextPreviews = nextFiles.map((file) => URL.createObjectURL(file));
-
-    setCoverImageFiles((prev) => [...prev, ...nextFiles]);
-    setCoverImagePreviews((prev) => [...prev, ...nextPreviews]);
+    const preview = URL.createObjectURL(file);
+    setCoverImageFile(file);
+    setCoverImagePreview(preview);
     e.target.value = "";
   };
 
-  const removeNewCoverImage = (index) => {
-    setCoverImageFiles((prev) => prev.filter((_, idx) => idx !== index));
-    setCoverImagePreviews((prev) => {
-      const removed = prev[index];
-      revokePreviewUrls([removed]);
-      return prev.filter((_, idx) => idx !== index);
-    });
-  };
+  const removeCoverImage = () => {
+    if (
+      typeof coverImagePreview === "string" &&
+      coverImagePreview.startsWith("blob:")
+    ) {
+      URL.revokeObjectURL(coverImagePreview);
+    }
 
-  const removeExistingCoverImage = (index) => {
-    setExistingCoverImages((prev) => prev.filter((_, idx) => idx !== index));
+    setCoverImageFile(null);
+    setCoverImagePreview("");
+    setExistingCoverImage("");
   };
 
   return (
@@ -1216,51 +1219,44 @@ function PostModal({
                         </FormField>
 
                         <FormField label="Ảnh bìa blog">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            onChange={handleCoverImageChange}
-                            className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
-                          />
+                          <div className="space-y-3">
+                            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm font-medium text-[#2F3A67] hover:bg-[#F7F9FC]">
+                              <ImageIcon className="h-4 w-4" />
+                              Chọn ảnh bìa
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleCoverImageChange}
+                                className="hidden"
+                              />
+                            </label>
 
-                          {allCoverPreviewImages.length > 0 ? (
-                            <div className="mt-3 overflow-x-auto pb-2">
-                              <div className="flex gap-3">
-                                {allCoverPreviewImages.map((image, index) => (
-                                  <div
-                                    key={`${image.type}-${image.src}-${index}`}
-                                    className="relative h-40 min-w-[220px] overflow-hidden rounded-2xl border border-[#DCE6F7] bg-[#F8FAFF]"
-                                  >
-                                    <img
-                                      src={image.src}
-                                      alt={`cover-${index}`}
-                                      className="h-full w-full object-cover"
-                                    />
-
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        image.type === "existing"
-                                          ? removeExistingCoverImage(index)
-                                          : removeNewCoverImage(
-                                              index -
-                                                existingCoverImages.length,
-                                            )
-                                      }
-                                      className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-gray-700 shadow-sm hover:bg-white"
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </button>
-
-                                    <div className="absolute left-2 bottom-2 rounded-full bg-black/60 px-3 py-1 text-xs font-semibold text-white">
-                                      {index + 1}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
+                            <div className="text-xs text-[#8DA1C1]">
+                              Blog chỉ sử dụng 1 ảnh bìa.
                             </div>
-                          ) : null}
+
+                            {displayCoverImage ? (
+                              <div className="relative overflow-hidden rounded-2xl border border-[#DCE6F7] bg-[#F8FAFF]">
+                                <img
+                                  src={displayCoverImage}
+                                  alt="cover-preview"
+                                  className="h-52 w-full object-cover"
+                                />
+
+                                <button
+                                  type="button"
+                                  onClick={removeCoverImage}
+                                  className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-gray-700 shadow-sm hover:bg-white"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex h-52 w-full items-center justify-center rounded-2xl border border-dashed border-[#D6DFEF] bg-[#FAFBFD] text-sm text-[#8DA1C1]">
+                                Chưa có ảnh bìa
+                              </div>
+                            )}
+                          </div>
                         </FormField>
                       </div>
 
@@ -1351,7 +1347,7 @@ function PostModal({
                 <PostPreview
                   form={form}
                   blocks={blocks}
-                  coverImages={allCoverPreviewImages.map((item) => item.src)}
+                  coverImage={coverImagePreview || existingCoverImage}
                 />
               </div>
             </div>
@@ -1542,7 +1538,7 @@ function BlockEditor({
   );
 }
 
-function PostPreview({ form, blocks, coverImages = [] }) {
+function PostPreview({ form, blocks, coverImage = "" }) {
   const sortedBlocks = [...blocks].sort(
     (a, b) => Number(a.position || 0) - Number(b.position || 0),
   );
@@ -1563,24 +1559,15 @@ function PostPreview({ form, blocks, coverImages = [] }) {
         </p>
       </div>
 
-      {coverImages.length > 0 && (
-        <div className="mt-6 overflow-x-auto pb-2">
-          <div className="flex gap-3">
-            {coverImages.map((src, index) => (
-              <div
-                key={`${src}-${index}`}
-                className="h-52 min-w-[260px] overflow-hidden rounded-2xl border border-[#ECE7DF] bg-[#FAFBFD]"
-              >
-                <img
-                  src={src}
-                  alt={`cover-preview-${index}`}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-            ))}
-          </div>
+      {coverImage ? (
+        <div className="mt-6 overflow-hidden rounded-3xl border border-[#ECE7DF] bg-[#FAFBFD]">
+          <img
+            src={coverImage}
+            alt="cover-preview"
+            className="h-64 w-full object-cover md:h-72"
+          />
         </div>
-      )}
+      ) : null}
 
       <div className="mt-6 space-y-5">
         {sortedBlocks.map((block) => {
@@ -1682,10 +1669,6 @@ function StatusBadge({ status }) {
     Draft: {
       className: "bg-[#FEF3C7] text-[#B45309]",
       label: "Bản nháp",
-    },
-    Archived: {
-      className: "bg-[#F3F4F6] text-[#6B7280]",
-      label: "Lưu trữ",
     },
   };
 

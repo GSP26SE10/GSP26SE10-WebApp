@@ -482,19 +482,9 @@ export default function OwnerDish() {
         throw new Error("Vui lòng chọn nguyên liệu.");
       }
 
-      if (!detailForm.quantity || Number(detailForm.quantity) <= 0) {
-        throw new Error("Vui lòng nhập số lượng hợp lệ.");
-      }
-
-      if (!detailForm.unit.trim()) {
-        throw new Error("Vui lòng nhập đơn vị.");
-      }
-
       const payload = {
         dishId: Number(selectedDish.dishId),
         ingredientId: Number(detailForm.ingredientId),
-        quantity: Number(detailForm.quantity),
-        unit: detailForm.unit.trim(),
       };
 
       const res = await fetch(DISH_DETAIL_ENDPOINT, {
@@ -544,14 +534,6 @@ export default function OwnerDish() {
     try {
       if (!detailForm.ingredientId) {
         throw new Error("Vui lòng chọn nguyên liệu.");
-      }
-
-      if (!detailForm.quantity || Number(detailForm.quantity) <= 0) {
-        throw new Error("Vui lòng nhập số lượng hợp lệ.");
-      }
-
-      if (!detailForm.unit.trim()) {
-        throw new Error("Vui lòng nhập đơn vị.");
       }
 
       const payload = {
@@ -1208,26 +1190,6 @@ export default function OwnerDish() {
                       </select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field
-                        label="Số lượng"
-                        type="number"
-                        value={detailForm.quantity}
-                        onChange={(v) =>
-                          setDetailForm((p) => ({ ...p, quantity: v }))
-                        }
-                        required
-                      />
-                      <Field
-                        label="Đơn vị"
-                        value={detailForm.unit}
-                        onChange={(v) =>
-                          setDetailForm((p) => ({ ...p, unit: v }))
-                        }
-                        required
-                      />
-                    </div>
-
                     <div className="flex justify-end gap-3 pt-1">
                       {editingDetailId && (
                         <button
@@ -1270,14 +1232,7 @@ export default function OwnerDish() {
                             <div className="flex items-start justify-between gap-4">
                               <div>
                                 <div className="text-sm font-semibold text-gray-900">
-                                  {detail.ingredientName ||
-                                    `#${detail.ingredientId}`}
-                                </div>
-                                <div className="mt-1 text-sm text-gray-600">
-                                  {Number(detail.quantity).toLocaleString(
-                                    "vi-VN",
-                                  )}{" "}
-                                  {detail.unit}
+                                  {detail.ingredientName}
                                 </div>
                               </div>
 
@@ -1305,10 +1260,6 @@ export default function OwnerDish() {
                                   <Trash2 className="h-4 w-4" />
                                 </button>
                               </div>
-                            </div>
-
-                            <div className="mt-2 text-xs text-gray-400">
-                              DishDetailId: {detail.dishDetailId}
                             </div>
                           </div>
                         ))}
@@ -1431,7 +1382,7 @@ function DishCard({ dish, details, onClick }) {
             <div className="space-y-1">
               {details.slice(0, 3).map((item) => (
                 <div key={item.dishDetailId} className="text-sm text-gray-700">
-                  • {item.ingredientName} - {item.quantity} {item.unit}
+                  • {item.ingredientName}
                 </div>
               ))}
               {details.length > 3 && (

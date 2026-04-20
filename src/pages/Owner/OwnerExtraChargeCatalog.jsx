@@ -24,12 +24,13 @@ const EMPTY_FORM = {
   description: "",
   unit: "",
   unitPrice: "",
+  status: "1",
 };
 
 const STATUS_OPTIONS = [
   { value: "all", label: "Tất cả trạng thái" },
-  { value: "ACTIVE", label: "Đang hoạt động" },
-  { value: "INACTIVE", label: "Ngừng hoạt động" },
+  { value: "1", label: "Đang hoạt động" },
+  { value: "0", label: "Ngừng hoạt động" },
 ];
 
 export default function OwnerExtraChargeCatalog() {
@@ -82,7 +83,6 @@ export default function OwnerExtraChargeCatalog() {
       );
 
       const rawItems = Array.isArray(data?.items) ? data.items : [];
-
       let filtered = rawItems;
 
       const keyword = search.trim().toLowerCase();
@@ -107,14 +107,14 @@ export default function OwnerExtraChargeCatalog() {
 
       if (statusFilter !== "all") {
         filtered = filtered.filter(
-          (item) => String(item.status || "").toUpperCase() === statusFilter,
+          (item) => String(item.status) === String(statusFilter),
         );
       }
 
       setItems(filtered);
       setTotalPages(Number(data?.totalPages || 1));
       setTotalItems(
-        Number(data?.totalCount || data?.totalItems || filtered.length || 0),
+        Number(data?.totalCount || data?.totalItems || rawItems.length || 0),
       );
     } catch (err) {
       const message = err.message || "Đã có lỗi xảy ra";
@@ -150,6 +150,12 @@ export default function OwnerExtraChargeCatalog() {
         item.unitPrice === null || item.unitPrice === undefined
           ? ""
           : String(item.unitPrice),
+      status:
+        item.status === 0 || item.status === "0"
+          ? "0"
+          : item.status === 1 || item.status === "1"
+            ? "1"
+            : "1",
     });
     setOpenModal(true);
   };
@@ -168,6 +174,10 @@ export default function OwnerExtraChargeCatalog() {
     const price = Number(form.unitPrice);
     if (Number.isNaN(price) || price < 0) {
       return "Đơn giá không hợp lệ.";
+    }
+
+    if (form.status !== "0" && form.status !== "1") {
+      return "Vui lòng chọn trạng thái hợp lệ.";
     }
 
     return "";
@@ -191,6 +201,7 @@ export default function OwnerExtraChargeCatalog() {
         description: form.description.trim(),
         unit: form.unit.trim(),
         unitPrice: Number(form.unitPrice),
+        status: form.status === "0" || form.status === 0 ? 0 : 1,
       };
 
       if (selectedItem?.extraChargeCatalogId) {
@@ -249,7 +260,7 @@ export default function OwnerExtraChargeCatalog() {
 
   const stats = React.useMemo(() => {
     const activeCount = items.filter(
-      (item) => String(item.status || "").toUpperCase() === "ACTIVE",
+      (item) => Number(item.status) === 1,
     ).length;
 
     return [
@@ -319,7 +330,10 @@ export default function OwnerExtraChargeCatalog() {
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94A3B8]" />
                 <input
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
                   placeholder="Tìm charge type, tiêu đề, mô tả, đơn vị"
                   className="w-[280px] rounded-xl border border-[#D6DFEF] bg-white py-2 pl-10 pr-4 text-sm text-[#2F3A67] outline-none"
                 />
@@ -598,6 +612,19 @@ function ExtraChargeModal({
             />
           </FormField>
 
+          <FormField label="Trạng thái" required>
+            <select
+              value={form.status ?? "1"}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, status: e.target.value }))
+              }
+              className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
+            >
+              <option value="1">Đang hoạt động</option>
+              <option value="0">Ngừng hoạt động</option>
+            </select>
+          </FormField>
+
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
@@ -638,33 +665,28 @@ function FormField({ label, required = false, children }) {
 }
 
 function StatusBadge({ status }) {
-  const normalized = String(status || "").toUpperCase();
+  if (status === "ACTIVE" || status === "1" || status === 1) {
+    return (
+      <span className="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-[#DCFCE7] text-[#15803D]">
+        Đang hoạt động
+      </span>
+    );
+  }
 
-  const map = {
-    ACTIVE: {
-      label: "Đang hoạt động",
-      className: "bg-[#DCFCE7] text-[#15803D]",
-    },
-    INACTIVE: {
-      label: "Ngừng hoạt động",
-      className: "bg-[#F3F4F6] text-[#6B7280]",
-    },
-  };
-
-  const meta = map[normalized] || {
-    label: normalized || "Không rõ",
-    className: "bg-[#FEF3C7] text-[#B45309]",
-  };
+  if (status === "INACTIVE" || status === "0" || status === 0) {
+    return (
+      <span className="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-[#F3F4F6] text-[#6B7280]">
+        Ngừng hoạt động
+      </span>
+    );
+  }
 
   return (
-    <span
-      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${meta.className}`}
-    >
-      {meta.label}
+    <span className="inline-flex rounded-full px-3 py-1 text-xs font-semibold bg-yellow-100 text-yellow-700">
+      Không rõ
     </span>
   );
 }
-
 function formatCurrency(value) {
   const amount = Number(value || 0);
   return amount.toLocaleString("vi-VN") + " đ";

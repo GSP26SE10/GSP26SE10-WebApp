@@ -1577,9 +1577,9 @@ function GroupTable({ items, loading, deletingKey, onEdit, onDelete }) {
 
 function ModalShell({ title, description, onClose, children }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl">
-        <div className="mb-6 flex items-center justify-between gap-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 ">
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-[#EEF2F7] px-6 py-5">
           <div>
             <h3 className="text-2xl font-bold text-[#2F3A67]">{title}</h3>
             <p className="mt-1 text-sm text-[#8DA1C1]">{description}</p>
@@ -1593,7 +1593,10 @@ function ModalShell({ title, description, onClose, children }) {
             <X className="h-5 w-5" />
           </button>
         </div>
-        {children}
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 hide-scrollbar">
+          {children}
+        </div>
       </div>
     </div>
   );
