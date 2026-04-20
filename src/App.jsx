@@ -1,13 +1,13 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Toaster, toast } from "sonner";
+import { Toaster } from "sonner";
 import {
   BrowserRouter as Router,
   Routes,
   Route,
   Navigate,
-  Outlet,
 } from "react-router-dom";
+
+import RequireAuth from "./utils/RequireAuth";
+
 import LoginPage from "@/pages/LoginPage";
 import OwnerDashboard from "@/pages/Owner/OwnerDashboard";
 import OwnerMenu from "@/pages/Owner/OwnerMenu";
@@ -27,22 +27,8 @@ import OwnerTaskTemplate from "./pages/Owner/OwnerTaskTemplate";
 import OwnerExtraChargeCatalog from "./pages/Owner/OwnerExtraChargeCatalog";
 import OwnerContactRequest from "./pages/Owner/OwnerContactRequest";
 import OwnerMenuCategory from "./pages/Owner/OwnerMenuCategory";
-import useAutoLogout from "./utils/useAutoLogout";
-function RequireAuth({ children }) {
-  const token =
-    localStorage.getItem("accessToken") ||
-    sessionStorage.getItem("accessToken");
-
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return children ?? <Outlet />;
-}
 
 function AppContent() {
-  useAutoLogout();
-
   return (
     <main>
       <Routes>

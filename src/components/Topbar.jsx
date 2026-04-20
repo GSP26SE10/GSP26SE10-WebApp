@@ -12,6 +12,7 @@ import API_URL from "@/config/api";
 import ChatPanel from "@/components/ChatPanel";
 
 const USER_ENDPOINT = `${API_URL}/api/user`;
+const CHAT_READ_STORAGE_KEY = "owner_chat_last_read_map";
 
 function parseJwt(token) {
   try {
@@ -44,7 +45,14 @@ function getCurrentAuthUser() {
 
   return {
     userId:
-      payload.userId ?? payload.id ?? payload.nameid ?? payload.sub ?? null,
+      payload.userId ??
+      payload.id ??
+      payload.nameid ??
+      payload.sub ??
+      payload[
+        "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
+      ] ??
+      null,
     userName:
       payload.unique_name ??
       payload.userName ??
@@ -52,11 +60,29 @@ function getCurrentAuthUser() {
       payload.name ??
       "",
     email: payload.email ?? "",
-    role:
-      payload.role ??
-      payload["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"] ??
-      "",
   };
+}
+
+function readLastReadMap() {
+  try {
+    const raw = localStorage.getItem(CHAT_READ_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeLastReadMap(map) {
+  localStorage.setItem(CHAT_READ_STORAGE_KEY, JSON.stringify(map));
+}
+
+function formatIsoDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
 }
 
 export default function Topbar({
@@ -69,7 +95,6 @@ export default function Topbar({
   actions,
   avatarSrc = "",
   onMailClick,
-  unreadCount = 0,
   userName = "Người dùng",
   userEmail = "",
 }) {
@@ -83,12 +108,18 @@ export default function Topbar({
   const [profile, setProfile] = React.useState(null);
   const [loadingProfile, setLoadingProfile] = React.useState(true);
 
+  const [conversations, setConversations] = React.useState([]);
+  const [mailUnreadCount, setMailUnreadCount] = React.useState(0);
+  const [lastReadMap, setLastReadMap] = React.useState(() => readLastReadMap());
+
   const notificationRef = React.useRef(null);
   const userRef = React.useRef(null);
 
   const token =
     localStorage.getItem("accessToken") ||
     sessionStorage.getItem("accessToken");
+
+  const authUser = React.useMemo(() => getCurrentAuthUser(), [token]);
 
   const authHeaders = React.useMemo(
     () => ({
@@ -115,9 +146,7 @@ export default function Topbar({
     try {
       const res = await fetch(
         `${API_URL}/api/notification/my-notifications?page=1&pageSize=10`,
-        {
-          headers: authHeaders,
-        },
+        { headers: authHeaders },
       );
 
       const data = await res.json().catch(() => ({}));
@@ -166,7 +195,6 @@ export default function Topbar({
         }
       }
 
-      const authUser = getCurrentAuthUser();
       let currentUser = null;
 
       if (authUser?.userId) {
@@ -191,19 +219,100 @@ export default function Topbar({
         );
       }
 
-      if (!currentUser) {
-        setProfile(null);
-        return;
-      }
-
-      setProfile(currentUser);
+      setProfile(currentUser || null);
     } catch (err) {
       console.error("Fetch profile error:", err);
       setProfile(null);
     } finally {
       setLoadingProfile(false);
     }
-  }, []);
+  }, [authUser]);
+
+  const fetchConversations = React.useCallback(async () => {
+    if (!token) {
+      setConversations([]);
+      return [];
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/conversation`, {
+        headers: authHeaders,
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Không thể tải cuộc trò chuyện");
+      }
+
+      const items = Array.isArray(data?.items) ? data.items : [];
+      setConversations(items);
+      return items;
+    } catch (err) {
+      console.error("Fetch conversations error:", err);
+      setConversations([]);
+      return [];
+    }
+  }, [authHeaders, token]);
+
+  const fetchUnreadCount = React.useCallback(async () => {
+    if (!token) {
+      setMailUnreadCount(0);
+      return;
+    }
+
+    const convs = await fetchConversations();
+    if (!convs.length) {
+      setMailUnreadCount(0);
+      return;
+    }
+
+    try {
+      const results = await Promise.all(
+        convs.map(async (conv) => {
+          const conversationId = Number(conv.conversationId);
+          if (!conversationId) return 0;
+
+          const res = await fetch(
+            `${API_URL}/api/message?conversationId=${conversationId}&page=1&pageSize=100`,
+            { headers: authHeaders },
+          );
+
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) return 0;
+
+          const items = Array.isArray(data?.items) ? data.items : [];
+          const lastReadAt = lastReadMap[String(conversationId)] || null;
+
+          const unreadItems = items.filter((msg) => {
+            const senderId = Number(msg.senderId || 0);
+            const sentAt = formatIsoDate(msg.sentAt);
+            if (!sentAt) return false;
+
+            // Không tính tin nhắn do chính owner gửi
+            if (
+              authUser?.userId &&
+              String(senderId) === String(authUser.userId)
+            ) {
+              return false;
+            }
+
+            // Nếu chưa từng đọc conversation này, tất cả tin từ khách đều là unread
+            if (!lastReadAt) return true;
+
+            return new Date(sentAt).getTime() > new Date(lastReadAt).getTime();
+          });
+
+          return unreadItems.length;
+        }),
+      );
+
+      const total = results.reduce((sum, count) => sum + count, 0);
+      setMailUnreadCount(total);
+    } catch (err) {
+      console.error("Fetch unread count error:", err);
+    }
+  }, [authHeaders, authUser, fetchConversations, lastReadMap, token]);
 
   React.useEffect(() => {
     fetchNotifications();
@@ -213,12 +322,51 @@ export default function Topbar({
     fetchProfile();
   }, [fetchProfile]);
 
-  const handleMailClick = () => {
+  React.useEffect(() => {
+    fetchUnreadCount();
+  }, [fetchUnreadCount]);
+
+  React.useEffect(() => {
+    if (openChat) return;
+
+    const intervalId = window.setInterval(() => {
+      fetchUnreadCount();
+    }, 3000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [openChat, fetchUnreadCount]);
+
+  const markAllConversationsAsRead = React.useCallback(async () => {
+    const nowIso = new Date().toISOString();
+    const nextMap = { ...lastReadMap };
+
+    for (const conv of conversations) {
+      const id = Number(conv.conversationId);
+      if (!id) continue;
+      nextMap[String(id)] = nowIso;
+    }
+
+    setLastReadMap(nextMap);
+    writeLastReadMap(nextMap);
+    setMailUnreadCount(0);
+  }, [conversations, lastReadMap]);
+
+  const handleMailClick = async () => {
+    await markAllConversationsAsRead();
+
     if (onMailClick) {
       onMailClick();
       return;
     }
+
     setOpenChat(true);
+  };
+
+  const handleChatClose = async () => {
+    setOpenChat(false);
+    await fetchUnreadCount();
   };
 
   const toggleNotificationPanel = () => {
@@ -277,7 +425,12 @@ export default function Topbar({
 
   const handleLogout = () => {
     localStorage.removeItem("accessToken");
+    localStorage.removeItem("auth");
+    localStorage.removeItem("userProfile");
+    localStorage.removeItem(CHAT_READ_STORAGE_KEY);
     sessionStorage.removeItem("accessToken");
+    sessionStorage.removeItem("auth");
+    sessionStorage.removeItem("userProfile");
     window.location.href = "/login";
   };
 
@@ -352,9 +505,9 @@ export default function Topbar({
               className="p-2 rounded-full hover:bg-gray-100 relative"
             >
               <Mail className="h-5 w-5 text-gray-600" />
-              {unreadCount > 0 && (
+              {mailUnreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-[#E8712E] text-white text-[10px] flex items-center justify-center px-1">
-                  {unreadCount > 99 ? "99+" : unreadCount}
+                  {mailUnreadCount > 99 ? "99+" : mailUnreadCount}
                 </span>
               )}
             </button>
@@ -519,9 +672,7 @@ export default function Topbar({
         </div>
       </header>
 
-      {!onMailClick && (
-        <ChatPanel open={openChat} onClose={() => setOpenChat(false)} />
-      )}
+      {!onMailClick && <ChatPanel open={openChat} onClose={handleChatClose} />}
     </>
   );
 }

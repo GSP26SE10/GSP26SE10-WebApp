@@ -1,438 +1,308 @@
-import React from "react";
-import Sidebar from "@/components/Sidebar";
-import Topbar from "@/components/Topbar";
+import * as React from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Loader2,
+  Lock,
+  User,
+  Eye,
+  EyeOff,
+  LogIn,
+  ShieldCheck,
+} from "lucide-react";
 import API_URL from "@/config/api";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { Navigate, useNavigate } from "react-router-dom";
+import { hubConnection } from "@/signalr/connection";
 import { toast } from "sonner";
 
-const EMPTY_FORM = {
-  menuCategoryName: "",
-  description: "",
-  status: 1,
-};
+export default function LoginPage() {
+  const [identifier, setIdentifier] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [remember, setRemember] = React.useState(true);
 
-export default function OwnerMenuCategory() {
-  const [sbExpanded, setSbExpanded] = React.useState(false);
-  const [categories, setCategories] = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState("");
-  const [search, setSearch] = React.useState("");
+  const navigate = useNavigate();
+  const authToken =
+    localStorage.getItem("accessToken") ||
+    sessionStorage.getItem("accessToken");
 
-  const [openModal, setOpenModal] = React.useState(false);
-  const [modalMode, setModalMode] = React.useState("create");
-  const [selectedItem, setSelectedItem] = React.useState(null);
-  const [form, setForm] = React.useState(EMPTY_FORM);
+  if (authToken) {
+    return <Navigate to="/owner/dashboard" replace />;
+  }
 
-  const [submitting, setSubmitting] = React.useState(false);
-  const [deletingId, setDeletingId] = React.useState(null);
+  const canSubmit =
+    identifier.trim().length > 0 && password.length > 0 && !isLoading;
 
-  const fetchAllPages = async () => {
-    let currentPage = 1;
-    let total = 1;
-    const merged = [];
-
-    do {
-      const res = await fetch(
-        `${API_URL}/api/menu-category?page=${currentPage}&pageSize=100`,
-        {
-          headers: { accept: "*/*" },
-        },
-      );
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(data?.message || "Không thể tải danh mục menu");
-      }
-
-      const items = Array.isArray(data?.items) ? data.items : [];
-      merged.push(...items);
-
-      total = Number(data?.totalPages || 1);
-      currentPage += 1;
-    } while (currentPage <= total);
-
-    return merged;
-  };
-
-  const fetchData = React.useCallback(async () => {
-    setLoading(true);
-    setError("");
-
+  async function safeParse(res) {
+    const text = await res.text().catch(() => "");
+    if (!text) return null;
     try {
-      const items = await fetchAllPages();
-      setCategories(items);
-    } catch (err) {
-      setError(err.message || "Đã có lỗi xảy ra");
-    } finally {
-      setLoading(false);
+      return JSON.parse(text);
+    } catch {
+      return { raw: text };
     }
-  }, []);
+  }
 
-  React.useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  function extractToken(data) {
+    const root = data?.data && typeof data.data === "object" ? data.data : data;
+    return (
+      root?.accessToken ??
+      root?.token ??
+      root?.jwt ??
+      data?.accessToken ??
+      data?.token ??
+      null
+    );
+  }
 
-  const filteredItems = React.useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-    if (!keyword) return categories;
-
-    return categories.filter((item) => {
-      return (
-        String(item.menuCategoryName || "")
-          .toLowerCase()
-          .includes(keyword) ||
-        String(item.description || "")
-          .toLowerCase()
-          .includes(keyword)
-      );
-    });
-  }, [categories, search]);
-
-  const openCreateModal = () => {
-    setModalMode("create");
-    setSelectedItem(null);
-    setForm(EMPTY_FORM);
-    setOpenModal(true);
-  };
-
-  const openEditModal = (item) => {
-    setModalMode("edit");
-    setSelectedItem(item);
-    setForm({
-      menuCategoryName: item.menuCategoryName || "",
-      description: item.description || "",
-      status: Number(item.status ?? 1),
-    });
-    setOpenModal(true);
-  };
-
-  const closeModal = () => {
-    setOpenModal(false);
-    setSelectedItem(null);
-    setForm(EMPTY_FORM);
-  };
-
-  const handleSubmit = async (e) => {
+  async function handleSubmit(e) {
     e.preventDefault();
 
-    if (!form.menuCategoryName.trim()) {
-      toast.error("Vui lòng nhập tên danh mục menu.");
+    if (!identifier.trim() || !password) {
+      toast.error("Vui lòng nhập email/username và mật khẩu.");
       return;
     }
 
-    setSubmitting(true);
+    setIsLoading(true);
 
     try {
-      const isCreate = modalMode === "create";
-      const url = isCreate
-        ? `${API_URL}/api/menu-category`
-        : `${API_URL}/api/menu-category/${selectedItem.menuCategoryId}`;
-
-      const method = isCreate ? "POST" : "PUT";
-
-      const payload = {
-        menuCategoryName: form.menuCategoryName.trim(),
-        description: form.description.trim(),
-        status: Number(form.status),
-      };
-
-      const res = await fetch(url, {
-        method,
+      const res = await fetch(`${API_URL}/api/authentication/login`, {
+        method: "POST",
         headers: {
-          accept: "*/*",
+          Accept: "application/json",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload),
+        mode: "cors",
+        body: JSON.stringify({
+          userNameOrEmail: identifier.trim(),
+          password,
+        }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data = await safeParse(res);
 
       if (!res.ok) {
         throw new Error(
           data?.message ||
-            (isCreate
-              ? "Thêm danh mục menu thất bại"
-              : "Cập nhật danh mục menu thất bại"),
+            data?.error ||
+            data?.title ||
+            data?.raw ||
+            `HTTP ${res.status}`,
         );
       }
 
-      toast.success(
-        isCreate
-          ? "Thêm danh mục menu thành công"
-          : "Cập nhật danh mục menu thành công",
-      );
-
-      await fetchData();
-      closeModal();
-    } catch (err) {
-      toast.error(err.message || "Đã có lỗi xảy ra");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDelete = async (item) => {
-    const confirmed = window.confirm(
-      `Bạn có chắc muốn xóa danh mục "${item.menuCategoryName}" không?`,
-    );
-    if (!confirmed) return;
-
-    setDeletingId(item.menuCategoryId);
-
-    try {
-      const res = await fetch(
-        `${API_URL}/api/menu-category/${item.menuCategoryId}`,
-        {
-          method: "DELETE",
-          headers: { accept: "*/*" },
-        },
-      );
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(data?.message || "Xóa danh mục menu thất bại");
+      const token = extractToken(data);
+      if (!token) {
+        throw new Error("Không lấy được access token.");
       }
 
-      toast.success("Xóa danh mục menu thành công");
-      await fetchData();
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("auth");
+      localStorage.removeItem("userProfile");
+      sessionStorage.removeItem("accessToken");
+      sessionStorage.removeItem("auth");
+      sessionStorage.removeItem("userProfile");
+
+      const storage = remember ? localStorage : sessionStorage;
+      storage.setItem("accessToken", token);
+      storage.setItem(
+        "auth",
+        JSON.stringify({ token, savedAt: new Date().toISOString() }),
+      );
+
+      if (data?.data?.user || data?.user) {
+        storage.setItem(
+          "userProfile",
+          JSON.stringify(data?.data?.user ?? data?.user),
+        );
+      }
+
+      if (hubConnection.state === "Disconnected") {
+        await hubConnection.start();
+      }
+
+      toast.success("Đăng nhập thành công.");
+      navigate("/owner/dashboard", { replace: true });
     } catch (err) {
-      toast.error(err.message || "Đã có lỗi xảy ra");
+      console.error(err);
+      toast.error(err?.message || "Đăng nhập thất bại. Vui lòng thử lại.");
     } finally {
-      setDeletingId(null);
+      setIsLoading(false);
     }
-  };
+  }
 
   return (
     <div className="min-h-screen bg-[#FFFAF0] font-main">
-      <Sidebar onExpandChange={setSbExpanded} />
+      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-2">
+        <div className="relative hidden overflow-hidden lg:flex">
+          <div className="absolute inset-0 bg-gradient-to-br from-[#FFF3EA] via-[#FFFAF0] to-[#FFE4D1]" />
+          <div className="absolute -top-16 -left-16 h-56 w-56 rounded-full bg-[#F2B9A5]/40 blur-3xl" />
+          <div className="absolute bottom-10 right-10 h-72 w-72 rounded-full bg-[#FFD7BF]/50 blur-3xl" />
 
-      <div
-        className={`min-h-screen transition-[margin] duration-300 ease-in-out ${
-          sbExpanded ? "ml-72" : "ml-20"
-        }`}
-      >
-        <Topbar
-          breadcrumb={
-            <>
-              <span className="text-gray-400">QUẢN LÝ</span>
-              <span className="mx-2 text-gray-400">/</span>
-              <span className="text-gray-900">DANH MỤC MENU</span>
-            </>
-          }
-          showSearch
-          searchValue={search}
-          onSearchChange={setSearch}
-          searchPlaceholder="Tìm danh mục menu"
-        />
+          <div className="relative z-10 flex w-full flex-col justify-between p-12">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-[#F2B9A5] bg-white/80 px-4 py-2 text-sm font-semibold text-[#E8712E] shadow-sm">
+                <ShieldCheck className="h-4 w-4" />
+                Bookfet Management
+              </div>
 
-        <main className="px-7 py-6">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <h1 className="text-[20px] font-bold text-[#E54B2D]">
-              Quản lý danh mục menu
-            </h1>
+              <h1 className="mt-8 max-w-xl text-5xl font-bold leading-tight text-[#2F3A67]">
+                Chào mừng bạn quay trở lại
+              </h1>
 
-            <button
-              type="button"
-              onClick={openCreateModal}
-              className="h-11 px-4 rounded-lg bg-[#E8712E] text-white font-semibold text-sm flex items-center gap-2 hover:opacity-90 transition"
-            >
-              <Plus className="h-4 w-4" />
-              Thêm danh mục
-            </button>
-          </div>
-
-          {loading ? (
-            <div className="text-sm text-gray-500">Đang tải dữ liệu...</div>
-          ) : error ? (
-            <div className="text-sm text-red-500">{error}</div>
-          ) : filteredItems.length === 0 ? (
-            <div className="text-sm text-gray-500">
-              Không có danh mục menu phù hợp.
-            </div>
-          ) : (
-            <div className="overflow-x-auto rounded-2xl border border-[#F1F2F6] bg-white">
-              <table className="min-w-full">
-                <thead>
-                  <tr className="bg-[#FFF3EA]">
-                    <th className="px-4 py-4 text-left text-sm font-semibold text-[#2F3A67]">
-                      ID
-                    </th>
-                    <th className="px-4 py-4 text-left text-sm font-semibold text-[#2F3A67]">
-                      Tên danh mục
-                    </th>
-                    <th className="px-4 py-4 text-left text-sm font-semibold text-[#2F3A67]">
-                      Mô tả
-                    </th>
-                    <th className="px-4 py-4 text-left text-sm font-semibold text-[#2F3A67]">
-                      Trạng thái
-                    </th>
-                    <th className="px-4 py-4 text-right text-sm font-semibold text-[#2F3A67]">
-                      Thao tác
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredItems.map((item) => (
-                    <tr
-                      key={item.menuCategoryId}
-                      className="border-t border-[#F1F2F6]"
-                    >
-                      <td className="px-4 py-4 text-sm text-gray-700">
-                        #{item.menuCategoryId}
-                      </td>
-                      <td className="px-4 py-4 text-sm font-semibold text-[#2F3A67]">
-                        {item.menuCategoryName}
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-600">
-                        {item.description || "--"}
-                      </td>
-                      <td className="px-4 py-4">
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                            Number(item.status) === 1
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-slate-100 text-slate-500"
-                          }`}
-                        >
-                          {Number(item.status) === 1
-                            ? "Hoạt động"
-                            : "Ngưng hoạt động"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openEditModal(item)}
-                            className="h-9 px-3 rounded-lg border border-gray-200 text-sm font-medium text-[#2F3A67] hover:bg-gray-50 flex items-center gap-2"
-                          >
-                            <Pencil className="h-4 w-4" />
-                            Sửa
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(item)}
-                            disabled={deletingId === item.menuCategoryId}
-                            className="h-9 px-3 rounded-lg border border-red-200 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 disabled:opacity-60"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            {deletingId === item.menuCategoryId
-                              ? "Đang xóa..."
-                              : "Xóa"}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </main>
-      </div>
-
-      {openModal && (
-        <div className="fixed inset-0 z-[100] bg-black/20 backdrop-blur-[2px] flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <h2 className="text-lg font-bold text-gray-900">
-                {modalMode === "create"
-                  ? "Thêm danh mục menu"
-                  : "Cập nhật danh mục menu"}
-              </h2>
-              <button
-                type="button"
-                onClick={closeModal}
-                className="p-2 rounded-full hover:bg-gray-100"
-              >
-                <X className="h-5 w-5 text-gray-600" />
-              </button>
+              <p className="mt-5 max-w-lg text-base leading-7 text-gray-600">
+                Đăng nhập để quản lý menu, danh mục, dữ liệu vận hành và tiếp
+                tục công việc với giao diện đồng bộ cùng hệ thống quản trị.
+              </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Tên danh mục
-                </label>
-                <input
-                  type="text"
-                  value={form.menuCategoryName}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      menuCategoryName: e.target.value,
-                    }))
-                  }
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
-                  placeholder="Ví dụ: Buffet bò"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Mô tả
-                </label>
-                <textarea
-                  value={form.description}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      description: e.target.value,
-                    }))
-                  }
-                  rows={4}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
-                  placeholder="Nhập mô tả danh mục menu"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Trạng thái
-                </label>
-                <select
-                  value={String(form.status)}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      status: Number(e.target.value),
-                    }))
-                  }
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
-                >
-                  <option value="1">Hoạt động</option>
-                  <option value="0">Ngưng hoạt động</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="h-10 px-4 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="h-10 px-4 rounded-lg bg-[#E8712E] text-white font-semibold hover:opacity-90 transition disabled:opacity-60"
-                >
-                  {submitting
-                    ? "Đang lưu..."
-                    : modalMode === "create"
-                      ? "Thêm danh mục"
-                      : "Cập nhật"}
-                </button>
-              </div>
-            </form>
+            <div className="grid max-w-xl gap-4">
+              <FeatureCard
+                title="Giao diện đồng bộ"
+                description="Thiết kế cùng tone quản trị với màu cam chủ đạo, card trắng và trải nghiệm gọn gàng."
+              />
+              <FeatureCard
+                title="Đăng nhập nhanh chóng"
+                description="Hỗ trợ email hoặc username, lưu phiên đăng nhập và chuyển thẳng đến dashboard."
+              />
+            </div>
           </div>
         </div>
-      )}
+
+        <div className="flex items-center justify-center px-4 py-10 sm:px-6 lg:px-10">
+          <div className="w-full max-w-md">
+            <div className="rounded-[28px] border border-[#F1E3D8] bg-white p-8 shadow-[0_18px_45px_rgba(229,113,46,0.10)]">
+              <div className="mb-8 text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#FFF3EA] text-[#E8712E]">
+                  <LogIn className="h-7 w-7" />
+                </div>
+
+                <h2 className="text-[28px] font-bold text-[#2F3A67]">
+                  Đăng nhập
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-gray-500">
+                  Nhập email hoặc username và mật khẩu để tiếp tục.
+                </p>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div>
+                  <Label
+                    htmlFor="identifier"
+                    className="mb-2 block text-sm font-semibold text-[#2F3A67]"
+                  >
+                    Email hoặc Username
+                  </Label>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                      <User className="h-5 w-5" />
+                    </span>
+                    <Input
+                      id="identifier"
+                      name="identifier"
+                      autoComplete="username"
+                      placeholder="admin hoặc example@domain.com"
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
+                      className="h-12 rounded-xl border-gray-200 bg-[#FFFCF9] pl-12 text-sm outline-none focus-visible:ring-0 focus-visible:border-[#E8712E]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label
+                    htmlFor="password"
+                    className="mb-2 block text-sm font-semibold text-[#2F3A67]"
+                  >
+                    Mật khẩu
+                  </Label>
+                  <div className="relative">
+                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                      <Lock className="h-5 w-5" />
+                    </span>
+                    <Input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="current-password"
+                      placeholder="Nhập mật khẩu"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="h-12 rounded-xl border-gray-200 bg-[#FFFCF9] pl-12 pr-12 text-sm outline-none focus-visible:ring-0 focus-visible:border-[#E8712E]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 transition hover:text-[#E8712E]"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-5 w-5" />
+                      ) : (
+                        <Eye className="h-5 w-5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <label className="flex items-center gap-2 text-sm text-gray-600 select-none">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-[#E8712E]"
+                      checked={remember}
+                      onChange={(e) => setRemember(e.target.checked)}
+                    />
+                    Ghi nhớ đăng nhập
+                  </label>
+
+                  <a
+                    href="/forgot-password"
+                    className="text-sm font-semibold text-[#E8712E] hover:underline"
+                  >
+                    Quên mật khẩu?
+                  </a>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={!canSubmit}
+                  className="h-12 w-full rounded-xl bg-[#E8712E] text-sm font-semibold text-white shadow-[0_10px_24px_rgba(232,113,46,0.25)] transition hover:opacity-90 disabled:opacity-60"
+                >
+                  {isLoading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Đang đăng nhập...
+                    </span>
+                  ) : (
+                    "Đăng nhập"
+                  )}
+                </Button>
+              </form>
+
+              <div className="mt-6 text-center text-sm text-gray-500">
+                Chưa có tài khoản?{" "}
+                <a
+                  href="/register"
+                  className="font-semibold text-[#E8712E] hover:underline"
+                >
+                  Đăng ký
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FeatureCard({ title, description }) {
+  return (
+    <div className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur">
+      <div className="text-base font-bold text-[#2F3A67]">{title}</div>
+      <div className="mt-1 text-sm leading-6 text-gray-600">{description}</div>
     </div>
   );
 }

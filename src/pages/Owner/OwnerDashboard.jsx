@@ -511,8 +511,7 @@ export default function OwnerDashboard() {
                         </div>
 
                         <div className="mt-1 text-xs text-[#94A3B8]">
-                          {menu.soldQuantity} suất • {menu.totalOrders} đơn •{" "}
-                          {menu.totalGuests} khách
+                          {menu.soldQuantity} đơn đã bán
                         </div>
                       </div>
                     </div>
