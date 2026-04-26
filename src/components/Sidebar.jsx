@@ -21,6 +21,7 @@ import {
   UserRound,
   ClipboardPenLine,
   MessagesSquare,
+  Percent,
 } from "lucide-react";
 
 export default function Sidebar({ onExpandChange }) {
@@ -169,6 +170,12 @@ export default function Sidebar({ onExpandChange }) {
               expanded={expanded}
               icon={<ClipboardPenLine className="h-4 w-4" />}
               label="Task mẫu"
+            />
+            <SubItemLink
+              to="/owner/discount"
+              expanded={expanded}
+              icon={<Percent className="h-4 w-4" />}
+              label="Giảm giá"
             />
             <SubItemLink
               to="/owner/contact-request"

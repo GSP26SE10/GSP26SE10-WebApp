@@ -649,15 +649,13 @@ function OrderDetailPanel({
   const menuDishes = Array.isArray(menuSnapshot?.dishes)
     ? menuSnapshot.dishes
     : [];
-  const extraDishes = Array.isArray(detail?.customDishSnapshot?.customDishes)
+  const customDishItems = Array.isArray(
+    detail?.customDishSnapshot?.customDishes,
+  )
     ? detail.customDishSnapshot.customDishes
-    : Array.isArray(detail?.extraDishes)
-      ? detail.extraDishes
-      : Array.isArray(detail?.customDishes)
-        ? detail.customDishes
-        : Array.isArray(detail?.additionalDishes)
-          ? detail.additionalDishes
-          : [];
+    : [];
+
+  const extraDishes = customDishItems;
 
   const customDishTotal = Array.isArray(
     detail?.customDishSnapshot?.customDishes,
@@ -674,7 +672,14 @@ function OrderDetailPanel({
         0,
       )
     : 0;
-  const extraCost = Number(detail?.extraChargeCost || 0);
+  const extraCharges = Array.isArray(detail?.extraChargeSnapshot?.extraCharges)
+    ? detail.extraChargeSnapshot.extraCharges
+    : [];
+
+  const extraCost = extraCharges.reduce(
+    (sum, e) => sum + Number(e.totalAmount || 0),
+    0,
+  );
   const [openMenu, setOpenMenu] = React.useState(false);
 
   return (
@@ -1012,7 +1017,10 @@ function OrderDetailPanel({
                       </div>
                     </div>
                     <div className="font-semibold text-[#2F3A67]">
-                      {formatPrice(service.basePrice)}
+                      {formatPrice(
+                        Number(service.basePrice || 0) *
+                          Number(service.quantity || 1),
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1028,31 +1036,38 @@ function OrderDetailPanel({
             <div className="mt-1 text-lg font-semibold text-[#2F3A67] mb-4">
               Thông tin thanh toán
             </div>
-
+            const guestCount = Number(detail?.numberOfGuests || 0); const
+            menuTotal = menuBasePrice * guestCount; const discount = Number(
+            detail?.guestDiscountSnapshot?.discountAmount || 0 ); const subTotal
+            = menuTotal + serviceTotal + customDishTotal + extraCost; const
+            finalTotal = Math.max(subTotal - discount, 0);
             <div className="space-y-2">
-              <PaymentRow
-                label="Menu"
-                value={menuBasePrice * Number(detail?.numberOfGuests || 0)}
-              />
-              <PaymentRow label="Dịch vụ đi kèm" value={serviceTotal} />
+              <PaymentRow label="Menu" value={menuTotal} />
+              <PaymentRow label="Món lẻ" value={customDishTotal} />
+              <PaymentRow label="Dịch vụ" value={serviceTotal} />
+
               {extraCost > 0 && (
                 <PaymentRow label="Chi phí phát sinh" value={extraCost} />
               )}
 
               <div className="pt-2 mt-2 border-t border-[#F1F2F6]">
-                <PaymentRow
-                  label="Tổng tiền tiệc"
-                  value={detail?.totalPrice}
-                  highlight
-                />
+                <PaymentRow label="Tạm tính" value={subTotal} />
+
+                {discount > 0 && (
+                  <PaymentRow label="Giảm giá" value={discount} negative />
+                )}
+
+                <PaymentRow label="Thành tiền" value={finalTotal} highlight />
               </div>
 
               <div className="pt-2 mt-2 border-t border-[#F1F2F6]">
-                <PaymentRow label="Tổng đơn" value={order?.totalPrice} />
-                <PaymentRow label="Đã đặt cọc" value={order?.depositAmount} />
+                <PaymentRow label="Đặt cọc" value={order?.depositAmount} />
                 <PaymentRow
                   label="Còn lại"
-                  value={order?.remainingAmount}
+                  value={Math.max(
+                    finalTotal - Number(order?.depositAmount || 0),
+                    0,
+                  )}
                   highlight
                 />
               </div>
