@@ -683,9 +683,15 @@ function OrderDetailPanel({
   const [openMenu, setOpenMenu] = React.useState(false);
   const guestCount = Number(detail?.numberOfGuests || 0);
   const menuTotal = menuBasePrice * guestCount;
-  const discount = Number(detail?.guestDiscountSnapshot?.discountAmount || 0);
+  const guestDiscountSnapshot = detail?.guestDiscountSnapshot || null;
+  const discountAmount = Number(guestDiscountSnapshot?.discountAmount || 0);
+
   const subTotal = menuTotal + serviceTotal + customDishTotal + extraCost;
-  const finalTotal = Math.max(subTotal - discount, 0);
+
+  const finalTotal =
+    Number(guestDiscountSnapshot?.finalAmount || 0) > 0
+      ? Number(guestDiscountSnapshot.finalAmount)
+      : Math.max(subTotal - discountAmount, 0);
   return (
     <div className="space-y-5">
       <div className="rounded-[28px] border border-[#ECE7DF] bg-white p-6">
@@ -906,7 +912,39 @@ function OrderDetailPanel({
                 </div>
               </div>
             </div>
+            {guestDiscountSnapshot ? (
+              <div className="mt-5 rounded-2xl border border-[#D1FAE5] bg-[#ECFDF5] px-5 py-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-[#047857]">
+                      Giảm giá theo số khách
+                    </div>
 
+                    <div className="mt-1 text-sm text-[#065F46]">
+                      {guestDiscountSnapshot.note ||
+                        `Đạt từ ${guestDiscountSnapshot.minGuestCount} khách giảm ${guestDiscountSnapshot.discountPercent}%`}
+                    </div>
+
+                    <div className="mt-2 text-xs text-[#047857]">
+                      Số khách thực tế:{" "}
+                      {guestDiscountSnapshot.actualGuestCount || 0}
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-sm text-[#047857]">
+                      {guestDiscountSnapshot.discountPercent || 0}%
+                    </div>
+                    <div className="text-xl font-bold text-[#065F46]">
+                      -
+                      {formatPrice(
+                        Number(guestDiscountSnapshot.discountAmount || 0),
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <button
               type="button"
               onClick={() => setOpenMenu((prev) => !prev)}
@@ -1052,8 +1090,12 @@ function OrderDetailPanel({
               <div className="pt-2 mt-2 border-t border-[#F1F2F6]">
                 <PaymentRow label="Tạm tính" value={subTotal} />
 
-                {discount > 0 && (
-                  <PaymentRow label="Giảm giá" value={discount} negative />
+                {discountAmount > 0 && (
+                  <PaymentRow
+                    label="Giảm giá"
+                    value={discountAmount}
+                    negative
+                  />
                 )}
 
                 <PaymentRow label="Thành tiền" value={finalTotal} highlight />
@@ -1182,15 +1224,21 @@ function InfoBox({ icon, label, value }) {
   );
 }
 
-function PaymentRow({ label, value, highlight = false }) {
+function PaymentRow({ label, value, highlight = false, negative = false }) {
   return (
     <div className="flex items-center justify-between py-2">
       <div className="text-sm text-[#6B7280]">{label}</div>
+
       <div
         className={`text-sm font-semibold ${
-          highlight ? "text-[#E54B2D]" : "text-[#2B2B2B]"
+          negative
+            ? "text-[#15803D]"
+            : highlight
+              ? "text-[#E54B2D]"
+              : "text-[#2B2B2B]"
         }`}
       >
+        {negative ? "-" : ""}
         {formatPrice(value)}
       </div>
     </div>
