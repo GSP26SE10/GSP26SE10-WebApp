@@ -681,7 +681,11 @@ function OrderDetailPanel({
     0,
   );
   const [openMenu, setOpenMenu] = React.useState(false);
-
+  const guestCount = Number(detail?.numberOfGuests || 0);
+  const menuTotal = menuBasePrice * guestCount;
+  const discount = Number(detail?.guestDiscountSnapshot?.discountAmount || 0);
+  const subTotal = menuTotal + serviceTotal + customDishTotal + extraCost;
+  const finalTotal = Math.max(subTotal - discount, 0);
   return (
     <div className="space-y-5">
       <div className="rounded-[28px] border border-[#ECE7DF] bg-white p-6">
@@ -1036,11 +1040,6 @@ function OrderDetailPanel({
             <div className="mt-1 text-lg font-semibold text-[#2F3A67] mb-4">
               Thông tin thanh toán
             </div>
-            const guestCount = Number(detail?.numberOfGuests || 0); const
-            menuTotal = menuBasePrice * guestCount; const discount = Number(
-            detail?.guestDiscountSnapshot?.discountAmount || 0 ); const subTotal
-            = menuTotal + serviceTotal + customDishTotal + extraCost; const
-            finalTotal = Math.max(subTotal - discount, 0);
             <div className="space-y-2">
               <PaymentRow label="Menu" value={menuTotal} />
               <PaymentRow label="Món lẻ" value={customDishTotal} />
