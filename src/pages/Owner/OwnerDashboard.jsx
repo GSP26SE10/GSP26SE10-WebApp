@@ -7,6 +7,8 @@ import {
   XCircle,
   UtensilsCrossed,
   Banknote,
+  ClipboardList,
+  Clock3,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import API_URL from "@/config/api";
@@ -180,10 +182,16 @@ export default function OwnerDashboard() {
   }, [orders]);
 
   const pendingCount = orders.filter((x) => Number(x.status) === 1).length;
-  const completedCount = orders.filter((x) => Number(x.status) === 7).length;
-  const cancelledCount = orders.filter((x) =>
-    [3, 8].includes(Number(x.status)),
+  const approvedCount = orders.filter((x) => Number(x.status) === 2).length;
+  const rejectedCount = orders.filter((x) => Number(x.status) === 3).length;
+  const processingCount = orders.filter((x) =>
+    [4, 5].includes(Number(x.status)),
   ).length;
+  const waitingPaymentCount = orders.filter(
+    (x) => Number(x.status) === 6,
+  ).length;
+  const paidCount = orders.filter((x) => Number(x.status) === 7).length;
+  const cancelledCount = orders.filter((x) => Number(x.status) === 8).length;
 
   const displayRevenueData = React.useMemo(() => {
     if (!Array.isArray(revenueData)) return [];
@@ -233,6 +241,13 @@ export default function OwnerDashboard() {
 
   const stats = [
     {
+      title: "Doanh thu",
+      value: formatCompactPrice(totalRevenueFromChart),
+      icon: <Banknote className="h-5 w-5" />,
+      color: "#3B82F6",
+      active: true,
+    },
+    {
       title: "Chờ duyệt",
       value: pendingCount,
       icon: <Package className="h-5 w-5" />,
@@ -241,25 +256,50 @@ export default function OwnerDashboard() {
       onClick: () => navigate("/owner/orders/pending"),
     },
     {
-      title: "Hoàn thành",
-      value: completedCount,
+      title: "Đã duyệt",
+      value: approvedCount,
       icon: <CheckCircle2 className="h-5 w-5" />,
-      color: "#1F982A",
+      color: "#16A34A",
       active: false,
       onClick: () => navigate("/owner/orders/tracking"),
     },
     {
-      title: "Doanh thu",
-      value: formatCompactPrice(totalRevenueFromChart),
-      icon: <Banknote className="h-5 w-5" />,
-      color: "#3B82F6",
-      active: true,
+      title: "Đã từ chối",
+      value: rejectedCount,
+      icon: <XCircle className="h-5 w-5" />,
+      color: "#6B7280",
+      active: false,
+      onClick: () => navigate("/owner/orders/tracking"),
     },
     {
-      title: "Đơn hủy",
+      title: "Đang xử lý",
+      value: processingCount,
+      icon: <ClipboardList className="h-5 w-5" />,
+      color: "#2563EB",
+      active: false,
+      onClick: () => navigate("/owner/orders/tracking"),
+    },
+    {
+      title: "Chờ thanh toán",
+      value: waitingPaymentCount,
+      icon: <Clock3 className="h-5 w-5" />,
+      color: "#D97706",
+      active: false,
+      onClick: () => navigate("/owner/orders/tracking"),
+    },
+    {
+      title: "Đã thanh toán",
+      value: paidCount,
+      icon: <CheckCircle2 className="h-5 w-5" />,
+      color: "#7C3AED",
+      active: false,
+      onClick: () => navigate("/owner/orders/tracking"),
+    },
+    {
+      title: "Đã hủy",
       value: cancelledCount,
       icon: <XCircle className="h-5 w-5" />,
-      color: "#DE4444",
+      color: "#DC2626",
       active: false,
       onClick: () => navigate("/owner/orders/tracking"),
     },

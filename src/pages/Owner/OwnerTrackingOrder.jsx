@@ -166,39 +166,6 @@ export default function OwnerTrackingOrder() {
   React.useEffect(() => {
     fetchFeedbacks();
   }, [fetchFeedbacks]);
-  const fetchExtraChargesByDetail = React.useCallback(
-    async (orderDetailId) => {
-      if (!orderDetailId) {
-        setExtraCharges([]);
-        return;
-      }
-
-      setLoadingExtraCharges(true);
-
-      try {
-        const res = await fetch(`${EXTRA_CHARGE_ENDPOINT}/${orderDetailId}`, {
-          headers: {
-            accept: "*/*",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-
-        const data = await res.json().catch(() => []);
-
-        if (!res.ok) {
-          throw new Error("Không thể tải chi phí phát sinh");
-        }
-
-        setExtraCharges(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error(err);
-        setExtraCharges([]);
-      } finally {
-        setLoadingExtraCharges(false);
-      }
-    },
-    [token],
-  );
 
   const ownerId = React.useMemo(() => {
     const userRaw =
@@ -557,13 +524,7 @@ export default function OwnerTrackingOrder() {
       selectedDetail?.staffGroupId ? String(selectedDetail.staffGroupId) : "",
     );
   }, [selectedDetail]);
-  React.useEffect(() => {
-    if (activeTab === "completed" && selectedDetail?.orderDetailId) {
-      fetchExtraChargesByDetail(selectedDetail.orderDetailId);
-    } else {
-      setExtraCharges([]);
-    }
-  }, [activeTab, selectedDetail, fetchExtraChargesByDetail]);
+
   const handleAssignStaffGroup = async () => {
     if (!selectedOrder || !selectedDetail) return;
 
@@ -802,8 +763,6 @@ export default function OwnerTrackingOrder() {
                   activeTab={activeTab}
                   menuFeedbacks={menuFeedbacks}
                   serviceFeedbacks={serviceFeedbacks}
-                  extraCharges={extraCharges}
-                  loadingExtraCharges={loadingExtraCharges}
                   payments={payments}
                 />
               )}
@@ -843,25 +802,30 @@ function OrderDetailPanel({
   activeTab,
   menuFeedbacks,
   serviceFeedbacks,
-  extraCharges,
-  loadingExtraCharges,
   payments,
 }) {
   const orderDetails = Array.isArray(order?.orderDetails)
     ? order.orderDetails
     : [];
+
   const hasMultipleDetails = orderDetails.length > 1;
 
-  const menuSnapshot = detail?.menuSnapshot;
-  const serviceSnapshot = detail?.serviceSnapshot;
+  const menuSnapshot = detail?.menuSnapshot || {};
+  const serviceSnapshot = detail?.serviceSnapshot || {};
+  const customDishSnapshot = detail?.customDishSnapshot || {};
+  const guestDiscountSnapshot = detail?.guestDiscountSnapshot || null;
+  const extraChargeSnapshot = detail?.extraChargeSnapshot || null;
+
   const firstImage = getFirstImage(menuSnapshot?.imgUrl);
   const mapSrc = getGoogleMapEmbedUrl(detail?.address);
+
   const canAssignStaffGroup = Number(order.status) === 2;
   const isRejectedOrCancelled =
     Number(order?.status) === 3 || Number(order?.status) === 8;
 
-  const { refunds, refundedAmount, refundPercentOfPaid, refundPercentOfTotal } =
+  const { refunds, refundedAmount, refundPercentOfPaid } =
     getRefundSummary(order);
+
   const isCompleted = activeTab === "completed" || Number(order?.status) === 7;
 
   const detailStatus = Number(detail?.status ?? 1);
@@ -871,50 +835,57 @@ function OrderDetailPanel({
     ? menuSnapshot.dishes
     : [];
 
-  const extraDishes = Array.isArray(detail?.customDishSnapshot?.customDishes)
-    ? detail.customDishSnapshot.customDishes
-    : Array.isArray(detail?.extraDishes)
-      ? detail.extraDishes
-      : Array.isArray(detail?.customDishes)
-        ? detail.customDishes
-        : Array.isArray(detail?.additionalDishes)
-          ? detail.additionalDishes
-          : [];
+  const services = Array.isArray(serviceSnapshot?.services)
+    ? serviceSnapshot.services
+    : [];
 
-  const customDishItems = Array.isArray(
-    detail?.customDishSnapshot?.customDishes,
-  )
-    ? detail.customDishSnapshot.customDishes
+  const customDishItems = Array.isArray(customDishSnapshot?.customDishes)
+    ? customDishSnapshot.customDishes
+    : [];
+  const extraDishes = customDishItems;
+  const extraCharges = Array.isArray(extraChargeSnapshot?.extraCharges)
+    ? extraChargeSnapshot.extraCharges
     : [];
 
   const menuBasePrice = Number(menuSnapshot?.basePrice || 0);
+  const guestCount = Number(detail?.numberOfGuests || 0);
 
-  const serviceTotal = Array.isArray(serviceSnapshot?.services)
-    ? serviceSnapshot.services.reduce(
-        (sum, s) => sum + Number(s.basePrice || 0) * Number(s.quantity || 1),
-        0,
-      )
-    : 0;
+  const menuTotal = menuBasePrice * guestCount;
+
+  const serviceTotal = services.reduce(
+    (sum, s) => sum + Number(s.basePrice || 0) * Number(s.quantity || 1),
+    0,
+  );
 
   const customDishTotal = customDishItems.reduce(
     (sum, d) => sum + Number(d.totalAmount || 0),
     0,
   );
 
-  const extraChargeTotal = Array.isArray(extraCharges)
-    ? extraCharges.reduce((sum, e) => sum + Number(e.totalAmount || 0), 0)
-    : 0;
+  const extraChargeTotal = extraCharges.reduce(
+    (sum, e) => sum + Number(e.totalAmount || 0),
+    0,
+  );
 
-  const menuTotal = menuBasePrice * Number(detail?.numberOfGuests || 0);
-  const totalParty =
+  const subTotalBeforeDiscount =
     menuTotal + customDishTotal + serviceTotal + extraChargeTotal;
+
+  const discountAmount = Number(guestDiscountSnapshot?.discountAmount || 0);
+
+  const finalTotal =
+    Number(guestDiscountSnapshot?.finalAmount || 0) > 0
+      ? Number(guestDiscountSnapshot.finalAmount) + extraChargeTotal
+      : Math.max(subTotalBeforeDiscount - discountAmount, 0);
 
   const paidAmount = payments.reduce(
     (sum, p) => sum + Number(p.amount || 0),
     0,
   );
 
-  const remainingAmount = Math.max(totalParty - paidAmount, 0);
+  const remainingAmount =
+    Number(order?.remainingAmount || 0) > 0
+      ? Number(order.remainingAmount)
+      : Math.max(finalTotal - paidAmount, 0);
 
   const feedbacks = [
     ...(menuFeedbacks || []).filter(
@@ -1072,22 +1043,39 @@ function OrderDetailPanel({
                     label="Số khách"
                     value={`${detail?.numberOfGuests || 0} khách`}
                   />
+
                   <InfoBox
                     icon={<Wallet className="h-4 w-4" />}
                     label="Giá menu"
                     value={formatPrice(menuBasePrice)}
                   />
+
                   <InfoBox
                     icon={<Clock3 className="h-4 w-4" />}
                     label="Bắt đầu"
                     value={formatDateTime(detail?.startTime)}
                   />
+
                   <InfoBox
                     icon={<Clock3 className="h-4 w-4" />}
-                    label="Kết thúc"
+                    label="Kết thúc dự kiến"
                     value={formatDateTime(detail?.endTime)}
                   />
+
+                  {detail?.actualEndTime ? (
+                    <InfoBox
+                      icon={<Clock3 className="h-4 w-4" />}
+                      label="Kết thúc thực tế"
+                      value={formatDateTime(detail.actualEndTime)}
+                    />
+                  ) : null}
                 </div>
+
+                {detail?.overtimeMinutes ? (
+                  <div className="mt-3 rounded-xl border border-[#FEE2E2] bg-[#FEF2F2] px-4 py-3 text-sm font-medium text-[#B91C1C]">
+                    Quá giờ: {detail.overtimeMinutes} phút
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -1109,7 +1097,36 @@ function OrderDetailPanel({
                 </div>
               </div>
             </div>
+            {guestDiscountSnapshot ? (
+              <div className="mt-5 rounded-2xl border border-[#D1FAE5] bg-[#ECFDF5] px-5 py-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-[#047857]">
+                      Giảm giá theo số khách
+                    </div>
 
+                    <div className="mt-1 text-sm text-[#065F46]">
+                      {guestDiscountSnapshot.note ||
+                        `Đạt từ ${guestDiscountSnapshot.minGuestCount} khách giảm ${guestDiscountSnapshot.discountPercent}%`}
+                    </div>
+
+                    <div className="mt-2 text-xs text-[#047857]">
+                      Số khách thực tế:{" "}
+                      {guestDiscountSnapshot.actualGuestCount || 0}
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-sm text-[#047857]">
+                      {guestDiscountSnapshot.discountPercent || 0}%
+                    </div>
+                    <div className="text-xl font-bold text-[#065F46]">
+                      -{formatPrice(guestDiscountSnapshot.discountAmount)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <button
               type="button"
               onClick={() => setOpenMenu((prev) => !prev)}
@@ -1247,31 +1264,40 @@ function OrderDetailPanel({
                 Chi phí phát sinh
               </div>
 
-              {loadingExtraCharges ? (
-                <div className="text-sm text-gray-500">Đang tải...</div>
-              ) : extraCharges.length > 0 ? (
+              {extraCharges.length > 0 ? (
                 extraCharges.map((e, i) => (
-                  <div key={i} className="mb-4 border rounded-xl p-4">
-                    <div className="flex justify-between">
+                  <div
+                    key={e.orderDetailExtraChargeId || i}
+                    className="mb-4 border rounded-xl p-4"
+                  >
+                    <div className="flex justify-between gap-4">
                       <div>
                         <div className="font-semibold text-[#2B2B2B]">
-                          {e.title}
+                          {e.title || "Chi phí phát sinh"}
                         </div>
+
                         <div className="text-sm text-gray-500">
-                          {e.description || e.note}
+                          {e.description || e.note || "--"}
                         </div>
+
+                        <div className="text-xs text-gray-500 mt-1">
+                          {formatPrice(e.unitPrice)} x {e.quantity || 1}{" "}
+                          {e.unit || ""}
+                        </div>
+
+                        {e.incurredAt ? (
+                          <div className="text-xs text-gray-400 mt-1">
+                            Phát sinh: {formatDateTime(e.incurredAt)}
+                          </div>
+                        ) : null}
                       </div>
 
-                      <div className="text-red-500 font-semibold">
+                      <div className="text-red-500 font-semibold whitespace-nowrap">
                         {formatPrice(e.totalAmount)}
                       </div>
                     </div>
 
-                    <div className="text-xs text-gray-500 mt-1">
-                      {formatPrice(e.unitPrice)} x {e.quantity} {e.unit}
-                    </div>
-
-                    {e.image && (
+                    {e.image ? (
                       <div className="flex gap-2 mt-3 flex-wrap">
                         {(Array.isArray(e.image) ? e.image : [e.image]).map(
                           (url, idx) => (
@@ -1284,12 +1310,12 @@ function OrderDetailPanel({
                           ),
                         )}
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 ))
               ) : (
                 <div className="text-sm text-gray-500">
-                  Không có chi phí phát sinh
+                  Không có chi phí phát sinh.
                 </div>
               )}
             </div>
@@ -1325,19 +1351,29 @@ function OrderDetailPanel({
               <PaymentGroup
                 label="Dịch vụ"
                 total={serviceTotal}
-                items={serviceSnapshot?.services || []}
+                items={services}
                 type="service"
               />
 
               <PaymentGroup
-                label="Chi phí đền bù / phát sinh"
+                label="Chi phí phát sinh"
                 total={extraChargeTotal}
-                items={extraCharges || []}
+                items={extraCharges}
                 type="extraCharge"
               />
 
               <div className="pt-2 mt-2 border-t border-[#F1F2F6]">
-                <PaymentRow label="Tổng đơn" value={totalParty} highlight />
+                <PaymentRow label="Tạm tính" value={subTotalBeforeDiscount} />
+
+                {guestDiscountSnapshot ? (
+                  <PaymentRow
+                    label={`Giảm giá (${guestDiscountSnapshot.discountPercent || 0}%)`}
+                    value={discountAmount}
+                    negative
+                  />
+                ) : null}
+
+                <PaymentRow label="Thành tiền" value={finalTotal} highlight />
               </div>
 
               <div className="pt-2 mt-2 border-t border-[#F1F2F6]">
@@ -1607,7 +1643,13 @@ function InfoBox({ icon, label, value }) {
   );
 }
 
-function PaymentRow({ label, value, rightText, highlight = false }) {
+function PaymentRow({
+  label,
+  value,
+  rightText,
+  highlight = false,
+  negative = false,
+}) {
   return (
     <div className="flex items-center justify-between py-2">
       <div className="text-sm text-[#6B7280]">{label}</div>
@@ -1620,9 +1662,14 @@ function PaymentRow({ label, value, rightText, highlight = false }) {
         ) : (
           <span
             className={`text-sm font-semibold ${
-              highlight ? "text-[#E54B2D]" : "text-[#2B2B2B]"
+              negative
+                ? "text-[#15803D]"
+                : highlight
+                  ? "text-[#E54B2D]"
+                  : "text-[#2B2B2B]"
             }`}
           >
+            {negative ? "-" : ""}
             {formatPrice(value)}
           </span>
         )}
@@ -1631,7 +1678,7 @@ function PaymentRow({ label, value, rightText, highlight = false }) {
   );
 }
 
-function PaymentGroup({ label, total, items, type, guestCount = 0 }) {
+function PaymentGroup({ label, total, items = [], type, guestCount = 0 }) {
   return (
     <div className="py-2">
       <div className="flex items-center justify-between">
@@ -1641,22 +1688,22 @@ function PaymentGroup({ label, total, items, type, guestCount = 0 }) {
         </div>
       </div>
 
-      {items.length > 0 && (
+      {items.length > 0 ? (
         <div className="mt-2 space-y-1 pl-3 border-l border-[#E5E7EB]">
           {items.map((item, index) => {
             if (type === "menu") {
               const price = Number(item.unitPrice || 0);
               const qty = Number(item.quantity || 0);
-              const total = Number(item.totalAmount || 0);
+              const amount = Number(item.totalAmount || 0);
 
               return (
                 <div
                   key={index}
-                  className="flex items-center justify-between text-xs text-[#6B7280]"
+                  className="flex items-center justify-between gap-3 text-xs text-[#6B7280]"
                 >
                   <span className="truncate">{item.name}</span>
-                  <span>
-                    {formatPrice(price)} x {qty} khách = {formatPrice(total)}
+                  <span className="whitespace-nowrap">
+                    {formatPrice(price)} x {qty} khách = {formatPrice(amount)}
                   </span>
                 </div>
               );
@@ -1665,16 +1712,16 @@ function PaymentGroup({ label, total, items, type, guestCount = 0 }) {
             if (type === "service") {
               const price = Number(item.basePrice || 0);
               const qty = Number(item.quantity || 1);
-              const total = price * qty;
+              const amount = price * qty;
 
               return (
                 <div
                   key={item.serviceId || index}
-                  className="flex items-center justify-between text-xs text-[#6B7280]"
+                  className="flex items-center justify-between gap-3 text-xs text-[#6B7280]"
                 >
                   <span className="truncate">{item.serviceName}</span>
-                  <span>
-                    {formatPrice(price)} x {qty} = {formatPrice(total)}
+                  <span className="whitespace-nowrap">
+                    {formatPrice(price)} x {qty} = {formatPrice(amount)}
                   </span>
                 </div>
               );
@@ -1682,17 +1729,17 @@ function PaymentGroup({ label, total, items, type, guestCount = 0 }) {
 
             if (type === "dish") {
               const price = Number(item.unitPrice || 0);
-              const total = Number(item.totalAmount || 0);
+              const amount = Number(item.totalAmount || 0);
 
               return (
                 <div
                   key={item.dishId || index}
-                  className="flex items-center justify-between text-xs text-[#6B7280]"
+                  className="flex items-center justify-between gap-3 text-xs text-[#6B7280]"
                 >
                   <span className="truncate">{item.dishName}</span>
-                  <span>
+                  <span className="whitespace-nowrap">
                     {formatPrice(price)} x {guestCount} khách ={" "}
-                    {formatPrice(total)}
+                    {formatPrice(amount)}
                   </span>
                 </div>
               );
@@ -1701,19 +1748,19 @@ function PaymentGroup({ label, total, items, type, guestCount = 0 }) {
             if (type === "extraCharge") {
               const unitPrice = Number(item.unitPrice || 0);
               const qty = Number(item.quantity || 1);
-              const total = Number(item.totalAmount || 0);
+              const amount = Number(item.totalAmount || 0);
 
               return (
                 <div
                   key={item.orderDetailExtraChargeId || index}
-                  className="flex items-center justify-between text-xs text-[#6B7280]"
+                  className="flex items-center justify-between gap-3 text-xs text-[#6B7280]"
                 >
                   <span className="truncate">
                     {item.title || item.description || "Phát sinh"}
                   </span>
-                  <span>
+                  <span className="whitespace-nowrap">
                     {formatPrice(unitPrice)} x {qty} {item.unit || ""} ={" "}
-                    {formatPrice(total)}
+                    {formatPrice(amount)}
                   </span>
                 </div>
               );
@@ -1722,7 +1769,7 @@ function PaymentGroup({ label, total, items, type, guestCount = 0 }) {
             return null;
           })}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

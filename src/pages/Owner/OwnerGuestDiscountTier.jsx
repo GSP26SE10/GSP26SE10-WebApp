@@ -5,33 +5,31 @@ import API_URL from "@/config/api";
 import { toast } from "sonner";
 import {
   Plus,
-  Search,
   ChevronLeft,
   ChevronRight,
   X,
   Pencil,
   Trash2,
   Save,
+  Percent,
   Users,
-  Image as ImageIcon,
   ClipboardList,
 } from "lucide-react";
 
 const PAGE_SIZE = 10;
 
 const EMPTY_FORM = {
-  partyCategoryName: "",
-  description: "",
-  numberOfGuests: "",
-  serviceDurationMinutes: "",
+  minGuestCount: "",
+  discountPercent: "",
+  note: "",
   status: "1",
 };
 
-export default function OwnerPartyCategory() {
+export default function OwnerGuestDiscountTier() {
   const [sbExpanded, setSbExpanded] = React.useState(false);
 
-  const [allCategories, setAllCategories] = React.useState([]);
-  const [categories, setCategories] = React.useState([]);
+  const [allTiers, setAllTiers] = React.useState([]);
+  const [tiers, setTiers] = React.useState([]);
 
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
@@ -43,40 +41,13 @@ export default function OwnerPartyCategory() {
 
   const [openCreateModal, setOpenCreateModal] = React.useState(false);
   const [openDetailModal, setOpenDetailModal] = React.useState(false);
-  const [selectedCategory, setSelectedCategory] = React.useState(null);
+  const [selectedTier, setSelectedTier] = React.useState(null);
 
   const [form, setForm] = React.useState(EMPTY_FORM);
-  const [imageFile, setImageFile] = React.useState(null);
-  const [imagePreview, setImagePreview] = React.useState("");
-  const [existingImage, setExistingImage] = React.useState("");
 
   const [submitting, setSubmitting] = React.useState(false);
   const [updating, setUpdating] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
-
-  const cleanupPreview = React.useCallback((url) => {
-    if (typeof url === "string" && url.startsWith("blob:")) {
-      URL.revokeObjectURL(url);
-    }
-  }, []);
-
-  React.useEffect(() => {
-    return () => {
-      cleanupPreview(imagePreview);
-    };
-  }, [imagePreview, cleanupPreview]);
-
-  const resetImageState = React.useCallback(() => {
-    cleanupPreview(imagePreview);
-    setImageFile(null);
-    setImagePreview("");
-    setExistingImage("");
-  }, [cleanupPreview, imagePreview]);
-
-  const resetForm = React.useCallback(() => {
-    setForm(EMPTY_FORM);
-    resetImageState();
-  }, [resetImageState]);
 
   const fetchAllPages = React.useCallback(async (basePath, pageSize = 50) => {
     let currentPage = 1;
@@ -99,6 +70,7 @@ export default function OwnerPartyCategory() {
 
       const items = Array.isArray(data?.items) ? data.items : [];
       merged.push(...items);
+
       total = Number(data?.totalPages || 1);
       currentPage += 1;
     } while (currentPage <= total);
@@ -106,13 +78,13 @@ export default function OwnerPartyCategory() {
     return merged;
   }, []);
 
-  const fetchCategories = React.useCallback(async () => {
+  const fetchTiers = React.useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      const items = await fetchAllPages("/api/party-category", 50);
-      setAllCategories(items);
+      const items = await fetchAllPages("/api/guest-discount-tier", 50);
+      setAllTiers(items);
     } catch (err) {
       const message = err.message || "Đã có lỗi xảy ra";
       setError(message);
@@ -123,31 +95,31 @@ export default function OwnerPartyCategory() {
   }, [fetchAllPages]);
 
   React.useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
+    fetchTiers();
+  }, [fetchTiers]);
 
-  const filteredCategories = React.useMemo(() => {
+  const filteredTiers = React.useMemo(() => {
     const keyword = search.trim().toLowerCase();
 
-    return allCategories.filter((item) => {
+    return allTiers.filter((item) => {
       const matchSearch =
         !keyword ||
-        String(item.partyCategoryId || "")
+        String(item.guestDiscountTierId || "")
           .toLowerCase()
           .includes(keyword) ||
-        String(item.partyCategoryName || "")
+        String(item.minGuestCount || "")
           .toLowerCase()
           .includes(keyword) ||
-        String(item.description || "")
+        String(item.discountPercent || "")
           .toLowerCase()
           .includes(keyword) ||
-        String(item.numberOfGuests || "")
-          .toLowerCase()
-          .includes(keyword) ||
-        String(item.serviceDurationMinutes || "")
+        String(item.note || "")
           .toLowerCase()
           .includes(keyword) ||
         String(formatDate(item.createdAt) || "")
+          .toLowerCase()
+          .includes(keyword) ||
+        String(formatDate(item.updatedAt) || "")
           .toLowerCase()
           .includes(keyword);
 
@@ -157,7 +129,7 @@ export default function OwnerPartyCategory() {
 
       return matchSearch && matchStatus;
     });
-  }, [allCategories, search, statusFilter]);
+  }, [allTiers, search, statusFilter]);
 
   React.useEffect(() => {
     setPage(1);
@@ -166,7 +138,7 @@ export default function OwnerPartyCategory() {
   React.useEffect(() => {
     const nextTotalPages = Math.max(
       1,
-      Math.ceil(filteredCategories.length / PAGE_SIZE),
+      Math.ceil(filteredTiers.length / PAGE_SIZE),
     );
     setTotalPages(nextTotalPages);
 
@@ -179,107 +151,97 @@ export default function OwnerPartyCategory() {
       return;
     }
 
-    setCategories(filteredCategories.slice(start, end));
-  }, [filteredCategories, page]);
+    setTiers(filteredTiers.slice(start, end));
+  }, [filteredTiers, page]);
 
   const stats = React.useMemo(
     () => [
       {
-        title: "Tổng loại tiệc",
-        value: allCategories.length,
+        title: "Tổng mức giảm",
+        value: allTiers.length,
         icon: <ClipboardList className="h-5 w-5" />,
         bg: "bg-blue-100",
         text: "text-blue-600",
       },
       {
         title: "Đang hoạt động",
-        value: allCategories.filter((item) => Number(item.status) === 1).length,
+        value: allTiers.filter((item) => Number(item.status) === 1).length,
         icon: <Users className="h-5 w-5" />,
         bg: "bg-green-100",
         text: "text-green-600",
       },
+      {
+        title: "Giảm cao nhất",
+        value: `${Math.max(0, ...allTiers.map((item) => Number(item.discountPercent) || 0))}%`,
+        icon: <Percent className="h-5 w-5" />,
+        bg: "bg-orange-100",
+        text: "text-orange-600",
+      },
     ],
-    [allCategories],
+    [allTiers],
   );
 
-  const handleImageChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    cleanupPreview(imagePreview);
-    const nextPreview = URL.createObjectURL(file);
-
-    setImageFile(file);
-    setImagePreview(nextPreview);
-    e.target.value = "";
-  };
+  const resetForm = React.useCallback(() => {
+    setForm(EMPTY_FORM);
+  }, []);
 
   const openCreate = () => {
-    setSelectedCategory(null);
+    setSelectedTier(null);
     resetForm();
     setOpenCreateModal(true);
   };
 
   const openDetail = (item) => {
-    setSelectedCategory(item);
+    setSelectedTier(item);
     setForm({
-      partyCategoryName: item.partyCategoryName || "",
-      description: item.description || "",
-      numberOfGuests: String(item.numberOfGuests || ""),
-      serviceDurationMinutes: String(item.serviceDurationMinutes || ""),
+      minGuestCount: String(item.minGuestCount || ""),
+      discountPercent: String(item.discountPercent || ""),
+      note: item.note || "",
       status: String(normalizeStatusValue(item.status)),
     });
-    cleanupPreview(imagePreview);
-    setImageFile(null);
-    setImagePreview("");
-    setExistingImage(normalizePartyImage(item.imageUrl));
     setOpenDetailModal(true);
   };
 
   const closeModals = () => {
     setOpenCreateModal(false);
     setOpenDetailModal(false);
-    setSelectedCategory(null);
+    setSelectedTier(null);
     resetForm();
   };
 
   const validateForm = () => {
-    if (!form.partyCategoryName.trim()) {
-      return "Vui lòng nhập tên loại tiệc.";
+    if (!form.minGuestCount || Number(form.minGuestCount) <= 0) {
+      return "Vui lòng nhập số khách tối thiểu hợp lệ.";
     }
-    if (!form.numberOfGuests || Number(form.numberOfGuests) <= 0) {
-      return "Vui lòng nhập số lượng khách hợp lệ.";
+
+    if (
+      form.discountPercent === "" ||
+      Number(form.discountPercent) < 0 ||
+      Number(form.discountPercent) > 100
+    ) {
+      return "Vui lòng nhập phần trăm giảm từ 0 đến 100.";
     }
+
     return "";
   };
 
-  const buildFormData = ({ includeStatus = false } = {}) => {
+  const buildPayload = ({ includeStatus = false } = {}) => {
     const validationError = validateForm();
     if (validationError) {
       throw new Error(validationError);
     }
 
-    const formData = new FormData();
-    formData.append("PartyCategoryName", form.partyCategoryName.trim());
-    formData.append("NumberOfGuests", String(Number(form.numberOfGuests)));
-    formData.append(
-      "ServiceDurationMinutes",
-      String(Number(form.serviceDurationMinutes)),
-    );
-
-    if (form.description.trim()) {
-      formData.append("Description", form.description.trim());
-    }
+    const payload = {
+      minGuestCount: Number(form.minGuestCount),
+      discountPercent: Number(form.discountPercent),
+      note: form.note.trim(),
+    };
 
     if (includeStatus) {
-      formData.append("Status", String(normalizeStatusValue(form.status)));
+      payload.status = normalizeStatusValue(form.status);
     }
 
-    if (imageFile) {
-      formData.append("ImageUrl", imageFile);
-    }
-
-    return formData;
+    return payload;
   };
 
   const handleCreate = async (e) => {
@@ -287,22 +249,25 @@ export default function OwnerPartyCategory() {
     setSubmitting(true);
 
     try {
-      const body = buildFormData({ includeStatus: false });
+      const body = buildPayload({ includeStatus: false });
 
-      const res = await fetch(`${API_URL}/api/party-category`, {
+      const res = await fetch(`${API_URL}/api/guest-discount-tier`, {
         method: "POST",
-        headers: { accept: "*/*" },
-        body,
+        headers: {
+          accept: "*/*",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
       });
 
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(data?.message || "Tạo loại tiệc thất bại");
+        throw new Error(data?.message || "Tạo mức giảm thất bại");
       }
 
-      toast.success("Tạo loại tiệc thành công.");
-      await fetchCategories();
+      toast.success("Tạo mức giảm thành công.");
+      await fetchTiers();
       closeModals();
     } catch (err) {
       toast.error(err.message || "Đã có lỗi xảy ra");
@@ -313,30 +278,33 @@ export default function OwnerPartyCategory() {
 
   const handleUpdate = async (e) => {
     e.preventDefault();
-    if (!selectedCategory?.partyCategoryId) return;
+    if (!selectedTier?.guestDiscountTierId) return;
 
     setUpdating(true);
 
     try {
-      const body = buildFormData({ includeStatus: true });
+      const body = buildPayload({ includeStatus: true });
 
       const res = await fetch(
-        `${API_URL}/api/party-category/${selectedCategory.partyCategoryId}`,
+        `${API_URL}/api/guest-discount-tier/${selectedTier.guestDiscountTierId}`,
         {
           method: "PUT",
-          headers: { accept: "*/*" },
-          body,
+          headers: {
+            accept: "*/*",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
         },
       );
 
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(data?.message || "Cập nhật loại tiệc thất bại");
+        throw new Error(data?.message || "Cập nhật mức giảm thất bại");
       }
 
-      toast.success("Cập nhật loại tiệc thành công.");
-      await fetchCategories();
+      toast.success("Cập nhật mức giảm thành công.");
+      await fetchTiers();
       closeModals();
     } catch (err) {
       toast.error(err.message || "Đã có lỗi xảy ra");
@@ -346,10 +314,10 @@ export default function OwnerPartyCategory() {
   };
 
   const handleDelete = async () => {
-    if (!selectedCategory?.partyCategoryId) return;
+    if (!selectedTier?.guestDiscountTierId) return;
 
     const confirmed = window.confirm(
-      `Bạn có chắc muốn xóa loại tiệc "${selectedCategory.partyCategoryName}" không?`,
+      `Bạn có chắc muốn xóa mức giảm từ ${selectedTier.minGuestCount} khách không?`,
     );
     if (!confirmed) return;
 
@@ -357,7 +325,7 @@ export default function OwnerPartyCategory() {
 
     try {
       const res = await fetch(
-        `${API_URL}/api/party-category/${selectedCategory.partyCategoryId}`,
+        `${API_URL}/api/guest-discount-tier/${selectedTier.guestDiscountTierId}`,
         {
           method: "DELETE",
           headers: { accept: "*/*" },
@@ -367,11 +335,11 @@ export default function OwnerPartyCategory() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(data?.message || "Xóa loại tiệc thất bại");
+        throw new Error(data?.message || "Xóa mức giảm thất bại");
       }
 
-      toast.success("Xóa loại tiệc thành công.");
-      await fetchCategories();
+      toast.success("Xóa mức giảm thành công.");
+      await fetchTiers();
       closeModals();
     } catch (err) {
       toast.error(err.message || "Đã có lỗi xảy ra");
@@ -394,13 +362,15 @@ export default function OwnerPartyCategory() {
             <>
               <span className="text-gray-400">QUẢN LÝ</span>
               <span className="text-gray-400 mx-2">/</span>
-              <span className="text-[#2F3A67] font-bold">LOẠI TIỆC</span>
+              <span className="text-[#2F3A67] font-bold">
+                GIẢM GIÁ THEO SỐ KHÁCH
+              </span>
             </>
           }
           showSearch
           searchValue={search}
           onSearchChange={setSearch}
-          searchPlaceholder="Tìm loại tiệc"
+          searchPlaceholder="Tìm mức giảm"
         />
 
         <main className="px-7 py-6">
@@ -428,7 +398,7 @@ export default function OwnerPartyCategory() {
 
           <div className="mt-8 flex flex-wrap items-center justify-between gap-4">
             <h1 className="text-[20px] font-bold text-[#E54B2D]">
-              Quản lý loại tiệc
+              Quản lý giảm giá theo số khách
             </h1>
 
             <div className="flex items-center gap-3">
@@ -448,7 +418,7 @@ export default function OwnerPartyCategory() {
                 className="inline-flex items-center gap-2 rounded-xl bg-[#2F3A67] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
               >
                 <Plus className="h-4 w-4" />
-                Thêm loại tiệc
+                Thêm mức giảm
               </button>
             </div>
           </div>
@@ -456,7 +426,7 @@ export default function OwnerPartyCategory() {
           <div className="mt-6 rounded-3xl bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between gap-4">
               <h2 className="text-[24px] font-bold text-[#2F3A67]">
-                Danh sách loại tiệc
+                Danh sách mức giảm
               </h2>
 
               <div className="flex items-center gap-3">
@@ -487,15 +457,15 @@ export default function OwnerPartyCategory() {
 
             {loading ? (
               <div className="rounded-2xl bg-[#FAFBFD] p-6 text-sm text-gray-500">
-                Đang tải loại tiệc...
+                Đang tải mức giảm...
               </div>
             ) : error ? (
               <div className="rounded-2xl bg-[#FAFBFD] p-6 text-sm text-red-500">
                 {error}
               </div>
-            ) : filteredCategories.length === 0 ? (
+            ) : filteredTiers.length === 0 ? (
               <div className="rounded-2xl bg-[#FAFBFD] p-6 text-sm text-gray-500">
-                Không tìm thấy loại tiệc nào.
+                Không tìm thấy mức giảm nào.
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -503,26 +473,22 @@ export default function OwnerPartyCategory() {
                   <thead>
                     <tr>
                       <th className="px-4 text-left text-xs font-semibold uppercase tracking-wide text-[#8DA1C1]">
-                        Ảnh
+                        Số khách tối thiểu
                       </th>
                       <th className="px-4 text-left text-xs font-semibold uppercase tracking-wide text-[#8DA1C1]">
-                        Tên loại tiệc
+                        Phần trăm giảm
                       </th>
                       <th className="px-4 text-left text-xs font-semibold uppercase tracking-wide text-[#8DA1C1]">
-                        Mô tả
+                        Ghi chú
                       </th>
                       <th className="px-4 text-left text-xs font-semibold uppercase tracking-wide text-[#8DA1C1]">
-                        Số khách
+                        Trạng thái
                       </th>
-                      <th className="px-4 text-left text-xs font-semibold uppercase tracking-wide text-[#8DA1C1]">
-                        Thời lượng
-                      </th>
-
                       <th className="px-4 text-left text-xs font-semibold uppercase tracking-wide text-[#8DA1C1]">
                         Ngày tạo
                       </th>
                       <th className="px-4 text-left text-xs font-semibold uppercase tracking-wide text-[#8DA1C1]">
-                        Trạng thái
+                        Cập nhật
                       </th>
                       <th className="px-4 text-left text-xs font-semibold uppercase tracking-wide text-[#8DA1C1]">
                         Thao tác
@@ -531,67 +497,50 @@ export default function OwnerPartyCategory() {
                   </thead>
 
                   <tbody>
-                    {categories.map((item) => (
+                    {tiers.map((item) => (
                       <tr
-                        key={item.partyCategoryId}
+                        key={item.guestDiscountTierId}
                         className="overflow-hidden rounded-2xl bg-[#FAFBFD]"
                       >
                         <td className="px-4 py-4 align-middle">
-                          <div className="h-14 w-14 overflow-hidden rounded-2xl bg-white ring-1 ring-[#EEF2F7]">
-                            <img
-                              src={
-                                normalizePartyImage(item.imageUrl) ||
-                                "/logo.png"
-                              }
-                              alt={item.partyCategoryName}
-                              className="h-full w-full object-cover"
-                              onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.src = generateTextLogo(
-                                  item.partyCategoryName,
-                                );
-                              }}
-                            />
+                          <div className="font-semibold text-[#2F3A67]">
+                            Từ {item.minGuestCount || 0} khách
                           </div>
                         </td>
 
                         <td className="px-4 py-4 align-middle">
-                          <div className="font-semibold text-[#2F3A67]">
-                            {item.partyCategoryName}
-                          </div>
+                          <span className="inline-flex rounded-full bg-[#FFF1E8] px-3 py-1 text-sm font-bold text-[#E54B2D]">
+                            {item.discountPercent || 0}%
+                          </span>
                         </td>
 
                         <td className="px-4 py-4 align-middle">
                           <div className="max-w-[320px] text-sm leading-6 text-[#42526B] line-clamp-2">
-                            {item.description || "--"}
+                            {item.note || "--"}
                           </div>
                         </td>
 
-                        <td className="px-4 py-4 align-middle text-sm font-medium text-[#2B2B2B]">
-                          {item.numberOfGuests || 0} khách
-                        </td>
-                        <td className="px-4 py-4 align-middle text-sm font-medium text-[#2B2B2B]">
-                          {item.serviceDurationMinutes || 0} phút
+                        <td className="px-4 py-4 align-middle">
+                          <StatusPill status={item.status} />
                         </td>
 
                         <td className="px-4 py-4 align-middle text-sm text-[#42526B]">
                           {formatDate(item.createdAt)}
                         </td>
-                        <td className="px-4 py-4 align-middle">
-                          <StatusPill status={item.status} />
+
+                        <td className="px-4 py-4 align-middle text-sm text-[#42526B]">
+                          {formatDate(item.updatedAt)}
                         </td>
 
                         <td className="px-4 py-4 align-middle">
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => openDetail(item)}
-                              className="inline-flex items-center gap-2 rounded-xl border border-[#D6DFEF] bg-white px-3 py-2 text-sm font-medium text-[#2F3A67] hover:bg-[#F7F9FC]"
-                            >
-                              <Pencil className="h-4 w-4" />
-                              Sửa
-                            </button>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => openDetail(item)}
+                            className="inline-flex items-center gap-2 rounded-xl border border-[#D6DFEF] bg-white px-3 py-2 text-sm font-medium text-[#2F3A67] hover:bg-[#F7F9FC]"
+                          >
+                            <Pencil className="h-4 w-4" />
+                            Sửa
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -604,31 +553,23 @@ export default function OwnerPartyCategory() {
       </div>
 
       {openCreateModal && (
-        <PartyCategoryModal
-          title="Thêm loại tiệc"
+        <GuestDiscountTierModal
+          title="Thêm mức giảm"
           form={form}
           setForm={setForm}
-          imagePreview={imagePreview}
-          existingImage={existingImage}
-          onImageChange={handleImageChange}
-          onRemoveImage={resetImageState}
           onClose={closeModals}
           onSubmit={handleCreate}
           submitting={submitting}
-          submitLabel={submitting ? "Đang tạo..." : "Tạo loại tiệc"}
+          submitLabel={submitting ? "Đang tạo..." : "Tạo mức giảm"}
           deleteButton={null}
         />
       )}
 
-      {openDetailModal && selectedCategory && (
-        <PartyCategoryModal
-          title="Cập nhật loại tiệc"
+      {openDetailModal && selectedTier && (
+        <GuestDiscountTierModal
+          title="Cập nhật mức giảm"
           form={form}
           setForm={setForm}
-          imagePreview={imagePreview}
-          existingImage={existingImage}
-          onImageChange={handleImageChange}
-          onRemoveImage={resetImageState}
           onClose={closeModals}
           onSubmit={handleUpdate}
           submitting={updating}
@@ -650,22 +591,16 @@ export default function OwnerPartyCategory() {
   );
 }
 
-function PartyCategoryModal({
+function GuestDiscountTierModal({
   title,
   form,
   setForm,
-  imagePreview,
-  existingImage,
-  onImageChange,
-  onRemoveImage,
   onClose,
   onSubmit,
   submitting,
   submitLabel,
   deleteButton,
 }) {
-  const displayImage = imagePreview || existingImage;
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -673,7 +608,7 @@ function PartyCategoryModal({
           <div>
             <h3 className="text-2xl font-bold text-[#2F3A67]">{title}</h3>
             <p className="mt-1 text-sm text-[#8DA1C1]">
-              Điền đầy đủ thông tin để lưu loại tiệc.
+              Thiết lập mức giảm dựa trên số lượng khách tối thiểu.
             </p>
           </div>
 
@@ -688,129 +623,70 @@ function PartyCategoryModal({
 
         <form onSubmit={onSubmit} className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <FormField label="Tên loại tiệc" required>
-              <input
-                type="text"
-                value={form.partyCategoryName}
-                onChange={(e) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    partyCategoryName: e.target.value,
-                  }))
-                }
-                className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
-                placeholder="Ví dụ: Tiệc cưới"
-              />
-            </FormField>
-
-            <FormField label="Số lượng khách" required>
+            <FormField label="Số khách tối thiểu" required>
               <input
                 type="number"
                 min="1"
-                value={form.numberOfGuests}
+                value={form.minGuestCount}
                 onChange={(e) =>
                   setForm((prev) => ({
                     ...prev,
-                    numberOfGuests: e.target.value,
+                    minGuestCount: e.target.value,
                   }))
                 }
                 className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
-                placeholder="Ví dụ: 200"
+                placeholder="Ví dụ: 50"
+              />
+            </FormField>
+
+            <FormField label="Phần trăm giảm" required>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={form.discountPercent}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    discountPercent: e.target.value,
+                  }))
+                }
+                className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
+                placeholder="Ví dụ: 5"
               />
             </FormField>
           </div>
 
-          <FormField label="Mô tả">
+          <FormField label="Ghi chú">
             <textarea
               rows={4}
-              value={form.description}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, description: e.target.value }))
-              }
-              className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
-              placeholder="Nhập mô tả loại tiệc"
-            />
-          </FormField>
-          <FormField label="Thời lượng dịch vụ (phút)" required>
-            <input
-              type="number"
-              min="1"
-              value={form.serviceDurationMinutes}
+              value={form.note}
               onChange={(e) =>
                 setForm((prev) => ({
                   ...prev,
-                  serviceDurationMinutes: e.target.value,
+                  note: e.target.value,
                 }))
               }
               className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
-              placeholder="Ví dụ: 300"
+              placeholder="Ví dụ: Đặt từ 50 khách giảm 5%"
             />
           </FormField>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <FormField label="Ảnh">
-              <div className="space-y-3">
-                <div className="space-y-3">
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm font-medium text-[#2F3A67] hover:bg-[#F7F9FC]">
-                    <ImageIcon className="h-4 w-4" />
-                    Chọn ảnh
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={onImageChange}
-                      className="hidden"
-                    />
-                  </label>
 
-                  <div className="text-xs text-[#8DA1C1]">
-                    Có thể để trống nếu chưa muốn thêm ảnh.
-                  </div>
-                </div>
-              </div>
-            </FormField>
-
-            <FormField label="Trạng thái" required>
-              <select
-                value={form.status}
-                onChange={(e) =>
-                  setForm((prev) => ({ ...prev, status: e.target.value }))
-                }
-                className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
-              >
-                <option value="1">Đang hoạt động</option>
-                <option value="0">Ngừng hoạt động</option>
-              </select>
-            </FormField>
-          </div>
-
-          {displayImage ? (
-            <div className="rounded-2xl border border-[#EEF2F7] bg-[#FAFBFD] p-4">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-[#8DA1C1]">
-                  Xem trước ảnh
-                </div>
-                <button
-                  type="button"
-                  onClick={onRemoveImage}
-                  className="text-xs font-medium text-[#C24141]"
-                >
-                  Xóa ảnh
-                </button>
-              </div>
-              <div className="h-44 overflow-hidden rounded-2xl bg-white ring-1 ring-[#EEF2F7]">
-                <img
-                  src={displayImage || "/logo.png"}
-                  alt="preview"
-                  className="h-full w-full object-cover"
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = generateTextLogo(
-                      form.partyCategoryName || "Logo",
-                    );
-                  }}
-                />
-              </div>
-            </div>
-          ) : null}
+          <FormField label="Trạng thái" required>
+            <select
+              value={form.status}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  status: e.target.value,
+                }))
+              }
+              className="w-full rounded-xl border border-[#DCE6F7] bg-white px-4 py-3 text-sm outline-none focus:border-[#7CA3FF]"
+            >
+              <option value="1">Đang hoạt động</option>
+              <option value="0">Ngừng hoạt động</option>
+            </select>
+          </FormField>
 
           <div className="flex items-center justify-between gap-3 pt-2">
             <div>{deleteButton}</div>
@@ -870,33 +746,6 @@ function normalizeStatusValue(status) {
   return 1;
 }
 
-function normalizePartyImage(imageUrl) {
-  if (!imageUrl || typeof imageUrl !== "string") return "";
-  if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://"))
-    return imageUrl;
-  return `${API_URL}${imageUrl}`;
-}
-
-function generateTextLogo(name) {
-  const canvas = document.createElement("canvas");
-  canvas.width = 100;
-  canvas.height = 100;
-  const ctx = canvas.getContext("2d");
-
-  // Background color
-  ctx.fillStyle = "#E8712E";
-  ctx.fillRect(0, 0, 100, 100);
-
-  // Text
-  ctx.fillStyle = "white";
-  ctx.font = "bold 50px Arial";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  const initial = (name || "").charAt(0).toUpperCase() || "?";
-  ctx.fillText(initial, 50, 50);
-
-  return canvas.toDataURL();
-}
 function formatDate(value) {
   if (!value) return "--";
 

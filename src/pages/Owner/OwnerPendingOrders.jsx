@@ -649,15 +649,13 @@ function OrderDetailPanel({
   const menuDishes = Array.isArray(menuSnapshot?.dishes)
     ? menuSnapshot.dishes
     : [];
-  const extraDishes = Array.isArray(detail?.customDishSnapshot?.customDishes)
+  const customDishItems = Array.isArray(
+    detail?.customDishSnapshot?.customDishes,
+  )
     ? detail.customDishSnapshot.customDishes
-    : Array.isArray(detail?.extraDishes)
-      ? detail.extraDishes
-      : Array.isArray(detail?.customDishes)
-        ? detail.customDishes
-        : Array.isArray(detail?.additionalDishes)
-          ? detail.additionalDishes
-          : [];
+    : [];
+
+  const extraDishes = customDishItems;
 
   const customDishTotal = Array.isArray(
     detail?.customDishSnapshot?.customDishes,
@@ -674,9 +672,26 @@ function OrderDetailPanel({
         0,
       )
     : 0;
-  const extraCost = Number(detail?.extraChargeCost || 0);
-  const [openMenu, setOpenMenu] = React.useState(false);
+  const extraCharges = Array.isArray(detail?.extraChargeSnapshot?.extraCharges)
+    ? detail.extraChargeSnapshot.extraCharges
+    : [];
 
+  const extraCost = extraCharges.reduce(
+    (sum, e) => sum + Number(e.totalAmount || 0),
+    0,
+  );
+  const [openMenu, setOpenMenu] = React.useState(false);
+  const guestCount = Number(detail?.numberOfGuests || 0);
+  const menuTotal = menuBasePrice * guestCount;
+  const guestDiscountSnapshot = detail?.guestDiscountSnapshot || null;
+  const discountAmount = Number(guestDiscountSnapshot?.discountAmount || 0);
+
+  const subTotal = menuTotal + serviceTotal + customDishTotal + extraCost;
+
+  const finalTotal =
+    Number(guestDiscountSnapshot?.finalAmount || 0) > 0
+      ? Number(guestDiscountSnapshot.finalAmount)
+      : Math.max(subTotal - discountAmount, 0);
   return (
     <div className="space-y-5">
       <div className="rounded-[28px] border border-[#ECE7DF] bg-white p-6">
@@ -897,7 +912,39 @@ function OrderDetailPanel({
                 </div>
               </div>
             </div>
+            {guestDiscountSnapshot ? (
+              <div className="mt-5 rounded-2xl border border-[#D1FAE5] bg-[#ECFDF5] px-5 py-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-[#047857]">
+                      Giảm giá theo số khách
+                    </div>
 
+                    <div className="mt-1 text-sm text-[#065F46]">
+                      {guestDiscountSnapshot.note ||
+                        `Đạt từ ${guestDiscountSnapshot.minGuestCount} khách giảm ${guestDiscountSnapshot.discountPercent}%`}
+                    </div>
+
+                    <div className="mt-2 text-xs text-[#047857]">
+                      Số khách thực tế:{" "}
+                      {guestDiscountSnapshot.actualGuestCount || 0}
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <div className="text-sm text-[#047857]">
+                      {guestDiscountSnapshot.discountPercent || 0}%
+                    </div>
+                    <div className="text-xl font-bold text-[#065F46]">
+                      -
+                      {formatPrice(
+                        Number(guestDiscountSnapshot.discountAmount || 0),
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
             <button
               type="button"
               onClick={() => setOpenMenu((prev) => !prev)}
@@ -1012,7 +1059,10 @@ function OrderDetailPanel({
                       </div>
                     </div>
                     <div className="font-semibold text-[#2F3A67]">
-                      {formatPrice(service.basePrice)}
+                      {formatPrice(
+                        Number(service.basePrice || 0) *
+                          Number(service.quantity || 1),
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1028,31 +1078,37 @@ function OrderDetailPanel({
             <div className="mt-1 text-lg font-semibold text-[#2F3A67] mb-4">
               Thông tin thanh toán
             </div>
-
             <div className="space-y-2">
-              <PaymentRow
-                label="Menu"
-                value={menuBasePrice * Number(detail?.numberOfGuests || 0)}
-              />
-              <PaymentRow label="Dịch vụ đi kèm" value={serviceTotal} />
+              <PaymentRow label="Menu" value={menuTotal} />
+              <PaymentRow label="Món lẻ" value={customDishTotal} />
+              <PaymentRow label="Dịch vụ" value={serviceTotal} />
+
               {extraCost > 0 && (
                 <PaymentRow label="Chi phí phát sinh" value={extraCost} />
               )}
 
               <div className="pt-2 mt-2 border-t border-[#F1F2F6]">
-                <PaymentRow
-                  label="Tổng tiền tiệc"
-                  value={detail?.totalPrice}
-                  highlight
-                />
+                <PaymentRow label="Tạm tính" value={subTotal} />
+
+                {discountAmount > 0 && (
+                  <PaymentRow
+                    label="Giảm giá"
+                    value={discountAmount}
+                    negative
+                  />
+                )}
+
+                <PaymentRow label="Thành tiền" value={finalTotal} highlight />
               </div>
 
               <div className="pt-2 mt-2 border-t border-[#F1F2F6]">
-                <PaymentRow label="Tổng đơn" value={order?.totalPrice} />
-                <PaymentRow label="Đã đặt cọc" value={order?.depositAmount} />
+                <PaymentRow label="Đặt cọc" value={order?.depositAmount} />
                 <PaymentRow
                   label="Còn lại"
-                  value={order?.remainingAmount}
+                  value={Math.max(
+                    finalTotal - Number(order?.depositAmount || 0),
+                    0,
+                  )}
                   highlight
                 />
               </div>
@@ -1168,15 +1224,21 @@ function InfoBox({ icon, label, value }) {
   );
 }
 
-function PaymentRow({ label, value, highlight = false }) {
+function PaymentRow({ label, value, highlight = false, negative = false }) {
   return (
     <div className="flex items-center justify-between py-2">
       <div className="text-sm text-[#6B7280]">{label}</div>
+
       <div
         className={`text-sm font-semibold ${
-          highlight ? "text-[#E54B2D]" : "text-[#2B2B2B]"
+          negative
+            ? "text-[#15803D]"
+            : highlight
+              ? "text-[#E54B2D]"
+              : "text-[#2B2B2B]"
         }`}
       >
+        {negative ? "-" : ""}
         {formatPrice(value)}
       </div>
     </div>
