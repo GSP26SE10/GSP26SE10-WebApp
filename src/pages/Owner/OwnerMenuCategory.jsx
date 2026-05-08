@@ -1,308 +1,536 @@
-import * as React from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Loader2,
-  Lock,
-  User,
-  Eye,
-  EyeOff,
-  LogIn,
-  ShieldCheck,
-} from "lucide-react";
+import React from "react";
+import Sidebar from "@/components/Sidebar";
+import Topbar from "@/components/Topbar";
 import API_URL from "@/config/api";
-import { Navigate, useNavigate } from "react-router-dom";
-import { hubConnection } from "@/signalr/connection";
 import { toast } from "sonner";
+import {
+  Plus,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Pencil,
+  Trash2,
+  Save,
+} from "lucide-react";
 
-export default function LoginPage() {
-  const [identifier, setIdentifier] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [showPassword, setShowPassword] = React.useState(false);
-  const [isLoading, setIsLoading] = React.useState(false);
-  const [remember, setRemember] = React.useState(true);
+const PAGE_SIZE = 9;
 
-  const navigate = useNavigate();
-  const authToken =
-    localStorage.getItem("accessToken") ||
-    sessionStorage.getItem("accessToken");
+const EMPTY_FORM = {
+  menuCategoryName: "",
+  description: "",
+};
 
-  if (authToken) {
-    return <Navigate to="/owner/dashboard" replace />;
-  }
+export default function OwnerMenuCategory() {
+  const [sbExpanded, setSbExpanded] = React.useState(false);
 
-  const canSubmit =
-    identifier.trim().length > 0 && password.length > 0 && !isLoading;
+  const [allCategories, setAllCategories] = React.useState([]);
+  const [categories, setCategories] = React.useState([]);
 
-  async function safeParse(res) {
-    const text = await res.text().catch(() => "");
-    if (!text) return null;
+  const [search, setSearch] = React.useState("");
+  const [page, setPage] = React.useState(1);
+  const [totalPages, setTotalPages] = React.useState(1);
+
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState("");
+
+  const [openModal, setOpenModal] = React.useState(false);
+  const [selectedCategory, setSelectedCategory] = React.useState(null);
+  const [form, setForm] = React.useState(EMPTY_FORM);
+
+  const [submitting, setSubmitting] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+
+  const getAuthHeaders = React.useCallback((json = false) => {
+    const token =
+      localStorage.getItem("token") ||
+      localStorage.getItem("accessToken") ||
+      localStorage.getItem("authToken");
+
+    return {
+      accept: "*/*",
+      ...(json ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  }, []);
+
+  const fetchAllPages = React.useCallback(
+    async (basePath, pageSize = 50) => {
+      let currentPage = 1;
+      let total = 1;
+      const merged = [];
+
+      do {
+        const res = await fetch(
+          `${API_URL}${basePath}?page=${currentPage}&pageSize=${pageSize}`,
+          { headers: getAuthHeaders(false) },
+        );
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          throw new Error(
+            data?.message || `Không thể tải dữ liệu từ ${basePath}`,
+          );
+        }
+
+        merged.push(...(Array.isArray(data?.items) ? data.items : []));
+        total = Number(data?.totalPages || 1);
+        currentPage += 1;
+      } while (currentPage <= total);
+
+      return merged;
+    },
+    [getAuthHeaders],
+  );
+
+  const fetchCategories = React.useCallback(async () => {
+    setLoading(true);
+    setError("");
+
     try {
-      return JSON.parse(text);
-    } catch {
-      return { raw: text };
+      const items = await fetchAllPages("/api/menu-category", 50);
+      setAllCategories(items);
+    } catch (err) {
+      const message = err.message || "Đã có lỗi xảy ra";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
     }
-  }
+  }, [fetchAllPages]);
 
-  function extractToken(data) {
-    const root = data?.data && typeof data.data === "object" ? data.data : data;
-    return (
-      root?.accessToken ??
-      root?.token ??
-      root?.jwt ??
-      data?.accessToken ??
-      data?.token ??
-      null
+  React.useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
+  const filteredCategories = React.useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+
+    return allCategories.filter((category) => {
+      const name = String(category.menuCategoryName || "").toLowerCase();
+      const description = String(category.description || "").toLowerCase();
+
+      return (
+        !keyword || name.includes(keyword) || description.includes(keyword)
+      );
+    });
+  }, [allCategories, search]);
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [search]);
+
+  React.useEffect(() => {
+    const nextTotalPages = Math.max(
+      1,
+      Math.ceil(filteredCategories.length / PAGE_SIZE),
     );
-  }
+    setTotalPages(nextTotalPages);
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+    const safePage = Math.min(page, nextTotalPages);
+    const start = (safePage - 1) * PAGE_SIZE;
+    const end = start + PAGE_SIZE;
 
-    if (!identifier.trim() || !password) {
-      toast.error("Vui lòng nhập email/username và mật khẩu.");
+    if (safePage !== page) {
+      setPage(safePage);
       return;
     }
 
-    setIsLoading(true);
+    setCategories(filteredCategories.slice(start, end));
+  }, [filteredCategories, page]);
+
+  const resetForm = () => {
+    setForm(EMPTY_FORM);
+    setSelectedCategory(null);
+  };
+
+  const openCreate = () => {
+    resetForm();
+    setOpenModal(true);
+  };
+
+  const openDetail = (category) => {
+    setSelectedCategory(category);
+    setForm({
+      menuCategoryName: category.menuCategoryName || "",
+      description: category.description || "",
+    });
+    setOpenModal(true);
+  };
+
+  const closeModal = () => {
+    setOpenModal(false);
+    resetForm();
+  };
+
+  const buildPayload = () => {
+    const menuCategoryName = form.menuCategoryName.trim();
+    const description = form.description.trim();
+
+    if (!menuCategoryName || !description) {
+      throw new Error("Vui lòng nhập đầy đủ tên danh mục và mô tả.");
+    }
+
+    return {
+      menuCategoryName,
+      description,
+    };
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+
+    const isEdit = Boolean(selectedCategory?.menuCategoryId);
 
     try {
-      const res = await fetch(`${API_URL}/api/authentication/login`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        mode: "cors",
-        body: JSON.stringify({
-          userNameOrEmail: identifier.trim(),
-          password,
-        }),
-      });
+      const payload = buildPayload();
 
-      const data = await safeParse(res);
+      const res = await fetch(
+        isEdit
+          ? `${API_URL}/api/menu-category/${selectedCategory.menuCategoryId}`
+          : `${API_URL}/api/menu-category`,
+        {
+          method: isEdit ? "PUT" : "POST",
+          headers: getAuthHeaders(true),
+          body: JSON.stringify(payload),
+        },
+      );
+
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
         throw new Error(
           data?.message ||
-            data?.error ||
-            data?.title ||
-            data?.raw ||
-            `HTTP ${res.status}`,
+            (isEdit ? "Cập nhật danh mục thất bại" : "Thêm danh mục thất bại"),
         );
       }
 
-      const token = extractToken(data);
-      if (!token) {
-        throw new Error("Không lấy được access token.");
-      }
+      toast.success(
+        isEdit ? "Cập nhật danh mục thành công." : "Thêm danh mục thành công.",
+      );
+      await fetchCategories();
+      closeModal();
+    } catch (err) {
+      toast.error(err.message || "Đã có lỗi xảy ra");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("auth");
-      localStorage.removeItem("userProfile");
-      sessionStorage.removeItem("accessToken");
-      sessionStorage.removeItem("auth");
-      sessionStorage.removeItem("userProfile");
+  const handleDelete = async () => {
+    if (!selectedCategory?.menuCategoryId) return;
 
-      const storage = remember ? localStorage : sessionStorage;
-      storage.setItem("accessToken", token);
-      storage.setItem(
-        "auth",
-        JSON.stringify({ token, savedAt: new Date().toISOString() }),
+    const confirmed = window.confirm(
+      `Bạn có chắc muốn xóa danh mục "${selectedCategory.menuCategoryName}" không?`,
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+
+    try {
+      const res = await fetch(
+        `${API_URL}/api/menu-category/${selectedCategory.menuCategoryId}`,
+        {
+          method: "DELETE",
+          headers: getAuthHeaders(false),
+        },
       );
 
-      if (data?.data?.user || data?.user) {
-        storage.setItem(
-          "userProfile",
-          JSON.stringify(data?.data?.user ?? data?.user),
-        );
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Xóa danh mục thất bại");
       }
 
-      if (hubConnection.state === "Disconnected") {
-        await hubConnection.start();
-      }
-
-      toast.success("Đăng nhập thành công.");
-      navigate("/owner/dashboard", { replace: true });
+      toast.success("Xóa danh mục thành công.");
+      await fetchCategories();
+      closeModal();
     } catch (err) {
-      console.error(err);
-      toast.error(err?.message || "Đăng nhập thất bại. Vui lòng thử lại.");
+      toast.error(err.message || "Đã có lỗi xảy ra");
     } finally {
-      setIsLoading(false);
+      setDeleting(false);
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-[#FFFAF0] font-main">
-      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-2">
-        <div className="relative hidden overflow-hidden lg:flex">
-          <div className="absolute inset-0 bg-gradient-to-br from-[#FFF3EA] via-[#FFFAF0] to-[#FFE4D1]" />
-          <div className="absolute -top-16 -left-16 h-56 w-56 rounded-full bg-[#F2B9A5]/40 blur-3xl" />
-          <div className="absolute bottom-10 right-10 h-72 w-72 rounded-full bg-[#FFD7BF]/50 blur-3xl" />
+    <div className="min-h-screen bg-[#FFF8F2] font-main">
+      <Sidebar onExpandChange={setSbExpanded} />
 
-          <div className="relative z-10 flex w-full flex-col justify-between p-12">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#F2B9A5] bg-white/80 px-4 py-2 text-sm font-semibold text-[#E8712E] shadow-sm">
-                <ShieldCheck className="h-4 w-4" />
-                Bookfet Management
-              </div>
+      <div
+        className={`min-h-screen transition-[margin] duration-300 ease-in-out ${
+          sbExpanded ? "ml-72" : "ml-20"
+        }`}
+      >
+        <Topbar
+          breadcrumb={
+            <>
+              <span className="text-gray-400">QUẢN LÝ</span>
+              <span className="text-gray-400 mx-2">/</span>
+              <span className="text-gray-900">DANH MỤC MENU</span>
+            </>
+          }
+          showSearch={false}
+        />
 
-              <h1 className="mt-8 max-w-xl text-5xl font-bold leading-tight text-[#2F3A67]">
-                Chào mừng bạn quay trở lại
-              </h1>
-
-              <p className="mt-5 max-w-lg text-base leading-7 text-gray-600">
-                Đăng nhập để quản lý menu, danh mục, dữ liệu vận hành và tiếp
-                tục công việc với giao diện đồng bộ cùng hệ thống quản trị.
-              </p>
-            </div>
-
-            <div className="grid max-w-xl gap-4">
-              <FeatureCard
-                title="Giao diện đồng bộ"
-                description="Thiết kế cùng tone quản trị với màu cam chủ đạo, card trắng và trải nghiệm gọn gàng."
-              />
-              <FeatureCard
-                title="Đăng nhập nhanh chóng"
-                description="Hỗ trợ email hoặc username, lưu phiên đăng nhập và chuyển thẳng đến dashboard."
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-center px-4 py-10 sm:px-6 lg:px-10">
-          <div className="w-full max-w-md">
-            <div className="rounded-[28px] border border-[#F1E3D8] bg-white p-8 shadow-[0_18px_45px_rgba(229,113,46,0.10)]">
-              <div className="mb-8 text-center">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#FFF3EA] text-[#E8712E]">
-                  <LogIn className="h-7 w-7" />
-                </div>
-
-                <h2 className="text-[28px] font-bold text-[#2F3A67]">
-                  Đăng nhập
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-gray-500">
-                  Nhập email hoặc username và mật khẩu để tiếp tục.
+        <main className="px-7 py-6">
+          <div className="mb-6 rounded-3xl border border-[#F2E2D7] bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex-1">
+                <h1 className="text-[22px] font-bold text-[#E54B2D]">
+                  Quản lý danh mục menu
+                </h1>
+                <p className="mt-1 text-sm text-gray-500">
+                  Thêm, sửa, xóa và tìm kiếm danh mục menu.
                 </p>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div>
-                  <Label
-                    htmlFor="identifier"
-                    className="mb-2 block text-sm font-semibold text-[#2F3A67]"
-                  >
-                    Email hoặc Username
-                  </Label>
-                  <div className="relative">
-                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                      <User className="h-5 w-5" />
-                    </span>
-                    <Input
-                      id="identifier"
-                      name="identifier"
-                      autoComplete="username"
-                      placeholder="admin hoặc example@domain.com"
-                      value={identifier}
-                      onChange={(e) => setIdentifier(e.target.value)}
-                      className="h-12 rounded-xl border-gray-200 bg-[#FFFCF9] pl-12 text-sm outline-none focus-visible:ring-0 focus-visible:border-[#E8712E]"
-                    />
-                  </div>
-                </div>
+              <button
+                type="button"
+                onClick={openCreate}
+                className="h-11 rounded-xl bg-[#E8712E] px-4 text-white font-semibold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition"
+              >
+                <Plus className="h-4 w-4" />
+                Thêm danh mục
+              </button>
+            </div>
 
-                <div>
-                  <Label
-                    htmlFor="password"
-                    className="mb-2 block text-sm font-semibold text-[#2F3A67]"
-                  >
-                    Mật khẩu
-                  </Label>
-                  <div className="relative">
-                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                      <Lock className="h-5 w-5" />
-                    </span>
-                    <Input
-                      id="password"
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="current-password"
-                      placeholder="Nhập mật khẩu"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="h-12 rounded-xl border-gray-200 bg-[#FFFCF9] pl-12 pr-12 text-sm outline-none focus-visible:ring-0 focus-visible:border-[#E8712E]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((v) => !v)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 transition hover:text-[#E8712E]"
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-5 w-5" />
-                      ) : (
-                        <Eye className="h-5 w-5" />
-                      )}
-                    </button>
-                  </div>
-                </div>
+            <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto]">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Tìm theo tên danh mục hoặc mô tả"
+                  className="h-11 w-full rounded-xl border border-gray-200 bg-[#FFFDFC] pl-11 pr-4 text-sm text-gray-700 outline-none transition focus:border-[#E8712E]"
+                />
+              </div>
 
-                <div className="flex items-center justify-between gap-3">
-                  <label className="flex items-center gap-2 text-sm text-gray-600 select-none">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 accent-[#E8712E]"
-                      checked={remember}
-                      onChange={(e) => setRemember(e.target.checked)}
-                    />
-                    Ghi nhớ đăng nhập
-                  </label>
-
-                  <a
-                    href="/forgot-password"
-                    className="text-sm font-semibold text-[#E8712E] hover:underline"
-                  >
-                    Quên mật khẩu?
-                  </a>
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={!canSubmit}
-                  className="h-12 w-full rounded-xl bg-[#E8712E] text-sm font-semibold text-white shadow-[0_10px_24px_rgba(232,113,46,0.25)] transition hover:opacity-90 disabled:opacity-60"
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="h-10 w-10 rounded-full border border-[#F2B9A5] bg-white text-[#E8712E] flex items-center justify-center hover:bg-[#FFF3EA] transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isLoading ? (
-                    <span className="inline-flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Đang đăng nhập...
-                    </span>
-                  ) : (
-                    "Đăng nhập"
-                  )}
-                </Button>
-              </form>
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
 
-              <div className="mt-6 text-center text-sm text-gray-500">
-                Chưa có tài khoản?{" "}
-                <a
-                  href="/register"
-                  className="font-semibold text-[#E8712E] hover:underline"
+                <div className="text-sm font-semibold text-gray-900">
+                  <span>{String(page).padStart(2, "0")}</span>
+                  <span className="text-gray-400">
+                    /{String(totalPages).padStart(2, "0")}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="h-10 w-10 rounded-full border border-[#F2B9A5] bg-[#E8712E] text-white flex items-center justify-center hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Đăng ký
-                </a>
+                  <ChevronRight className="h-5 w-5" />
+                </button>
               </div>
             </div>
           </div>
+
+          {loading ? (
+            <div className="text-sm text-gray-500">Đang tải dữ liệu...</div>
+          ) : error ? (
+            <div className="text-sm text-red-500">{error}</div>
+          ) : filteredCategories.length === 0 ? (
+            <div className="text-sm text-gray-500">
+              Không có danh mục phù hợp.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {categories.map((category) => (
+                <MenuCategoryCard
+                  key={category.menuCategoryId}
+                  category={category}
+                  onClick={() => openDetail(category)}
+                />
+              ))}
+            </div>
+          )}
+        </main>
+      </div>
+
+      {openModal && (
+        <MenuCategoryModal
+          form={form}
+          setForm={setForm}
+          selectedCategory={selectedCategory}
+          submitting={submitting}
+          deleting={deleting}
+          onClose={closeModal}
+          onSubmit={handleSubmit}
+          onDelete={handleDelete}
+        />
+      )}
+    </div>
+  );
+}
+
+function MenuCategoryCard({ category, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-2xl border border-[#E9E2D8] bg-white p-5 text-left shadow-sm transition hover:shadow-md"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[18px] font-bold leading-snug text-[#2D9C3C] line-clamp-2">
+            {category.menuCategoryName || "Chưa có tên"}
+          </div>
         </div>
+
+        <div className="shrink-0 rounded-full bg-[#FFF3EA] p-2 text-[#E8712E]">
+          <Pencil className="h-4 w-4" />
+        </div>
+      </div>
+
+      <div className="mt-4 min-h-[72px] text-sm leading-relaxed text-[#8A8A8A] line-clamp-4">
+        {category.description || "Chưa có mô tả"}
+      </div>
+
+      {category.createdAt && (
+        <div className="mt-4 border-t border-[#F2E2D7] pt-3 text-xs text-gray-400">
+          Ngày tạo: {formatDate(category.createdAt)}
+        </div>
+      )}
+    </button>
+  );
+}
+
+function MenuCategoryModal({
+  form,
+  setForm,
+  selectedCategory,
+  submitting,
+  deleting,
+  onClose,
+  onSubmit,
+  onDelete,
+}) {
+  const isEdit = Boolean(selectedCategory?.menuCategoryId);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 p-4 backdrop-blur-[2px]">
+      <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b bg-white px-6 py-4">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">
+              {isEdit ? "Chi tiết danh mục menu" : "Thêm danh mục menu"}
+            </h2>
+            {isEdit && (
+              <p className="mt-1 text-xs text-gray-400">
+                ID: #{selectedCategory.menuCategoryId}
+              </p>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-2 hover:bg-gray-100"
+          >
+            <X className="h-5 w-5 text-gray-600" />
+          </button>
+        </div>
+
+        <form onSubmit={onSubmit} className="space-y-5 p-6">
+          <Field
+            label="Tên danh mục"
+            value={form.menuCategoryName}
+            onChange={(v) =>
+              setForm((prev) => ({ ...prev, menuCategoryName: v }))
+            }
+            required
+          />
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Mô tả
+            </label>
+            <textarea
+              value={form.description}
+              required
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, description: e.target.value }))
+              }
+              rows={5}
+              className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
+              placeholder="Nhập mô tả danh mục"
+            />
+          </div>
+
+          <div className="flex justify-between gap-3 pt-2">
+            <div>
+              {isEdit && (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  disabled={deleting}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg bg-red-50 px-4 font-semibold text-red-600 transition hover:bg-red-100 disabled:opacity-60"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {deleting ? "Đang xóa..." : "Xóa"}
+                </button>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="h-10 rounded-lg border border-gray-300 px-4 text-gray-700 transition hover:bg-gray-50"
+              >
+                Hủy
+              </button>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#E8712E] px-4 font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+              >
+                <Save className="h-4 w-4" />
+                {submitting
+                  ? "Đang lưu..."
+                  : isEdit
+                    ? "Cập nhật"
+                    : "Thêm danh mục"}
+              </button>
+            </div>
+          </div>
+        </form>
       </div>
     </div>
   );
 }
 
-function FeatureCard({ title, description }) {
+function Field({ label, value, onChange, required = false, type = "text" }) {
   return (
-    <div className="rounded-2xl border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur">
-      <div className="text-base font-bold text-[#2F3A67]">{title}</div>
-      <div className="mt-1 text-sm leading-6 text-gray-600">{description}</div>
+    <div>
+      <label className="mb-1 block text-sm font-medium text-gray-700">
+        {label}
+      </label>
+      <input
+        type={type}
+        value={value}
+        required={required}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E]"
+      />
     </div>
   );
+}
+
+function formatDate(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("vi-VN");
 }

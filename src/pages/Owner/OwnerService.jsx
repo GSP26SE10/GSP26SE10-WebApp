@@ -9,8 +9,9 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
-  Pencil,
   Trash2,
+  Tags,
+  Save,
 } from "lucide-react";
 
 const PAGE_SIZE = 9;
@@ -33,6 +34,8 @@ export default function OwnerService() {
 
   const [allServices, setAllServices] = React.useState([]);
   const [services, setServices] = React.useState([]);
+  const [serviceExtraCharges, setServiceExtraCharges] = React.useState([]);
+  const [extraChargeCatalogs, setExtraChargeCatalogs] = React.useState([]);
 
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
@@ -84,10 +87,20 @@ export default function OwnerService() {
     let total = 1;
     const merged = [];
 
+    const token =
+      localStorage.getItem("token") ||
+      localStorage.getItem("accessToken") ||
+      localStorage.getItem("authToken");
+
     do {
       const res = await fetch(
         `${API_URL}${basePath}?page=${currentPage}&pageSize=${pageSize}`,
-        { headers: { accept: "*/*" } },
+        {
+          headers: {
+            accept: "*/*",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        },
       );
 
       const data = await res.json().catch(() => ({}));
@@ -98,8 +111,7 @@ export default function OwnerService() {
         );
       }
 
-      const items = Array.isArray(data?.items) ? data.items : [];
-      merged.push(...items);
+      merged.push(...(Array.isArray(data?.items) ? data.items : []));
       total = Number(data?.totalPages || 1);
       currentPage += 1;
     } while (currentPage <= total);
@@ -112,8 +124,16 @@ export default function OwnerService() {
     setError("");
 
     try {
-      const items = await fetchAllPages("/api/service", 50);
-      setAllServices(items);
+      const [serviceItems, serviceExtraChargeItems, extraChargeCatalogItems] =
+        await Promise.all([
+          fetchAllPages("/api/service", 50),
+          fetchAllPages("/api/service-extra-charge-catalog", 50),
+          fetchAllPages("/api/extra-charge-catalog", 50),
+        ]);
+
+      setAllServices(serviceItems);
+      setServiceExtraCharges(serviceExtraChargeItems);
+      setExtraChargeCatalogs(extraChargeCatalogItems);
     } catch (err) {
       const message = err.message || "Đã có lỗi xảy ra";
       setError(message);
@@ -127,22 +147,51 @@ export default function OwnerService() {
     fetchServices();
   }, [fetchServices]);
 
+  const extraChargesByServiceId = React.useMemo(() => {
+    return serviceExtraCharges.reduce((map, item) => {
+      const serviceId = Number(item.serviceId);
+      if (!map[serviceId]) map[serviceId] = [];
+      map[serviceId].push(item);
+      return map;
+    }, {});
+  }, [serviceExtraCharges]);
+
   const filteredServices = React.useMemo(() => {
     const keyword = search.trim().toLowerCase();
 
     return allServices.filter((service) => {
+      const serviceId = Number(service.serviceId);
+      const extraCharges = extraChargesByServiceId[serviceId] || [];
+
       const name = String(service.serviceName || "").toLowerCase();
       const description = String(service.description || "").toLowerCase();
       const status = String(normalizeStatusValue(service.status));
 
+      const extraChargeText = extraCharges
+        .map((item) =>
+          [
+            item.extraChargeCatalogTitle,
+            item.extraChargeType,
+            item.extraChargeCatalogId,
+          ]
+            .filter(Boolean)
+            .join(" "),
+        )
+        .join(" ")
+        .toLowerCase();
+
       const matchSearch =
-        !keyword || name.includes(keyword) || description.includes(keyword);
+        !keyword ||
+        name.includes(keyword) ||
+        description.includes(keyword) ||
+        extraChargeText.includes(keyword);
+
       const matchStatus =
         statusFilter === "all" || status === String(statusFilter);
 
       return matchSearch && matchStatus;
     });
-  }, [allServices, search, statusFilter]);
+  }, [allServices, extraChargesByServiceId, search, statusFilter]);
 
   React.useEffect(() => {
     setPage(1);
@@ -331,6 +380,115 @@ export default function OwnerService() {
     }
   };
 
+  const getAuthHeaders = React.useCallback((json = false) => {
+    const token =
+      localStorage.getItem("token") ||
+      localStorage.getItem("accessToken") ||
+      localStorage.getItem("authToken");
+
+    return {
+      accept: "*/*",
+      ...(json ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  }, []);
+
+  const handleCreateExtraCharge = async (extraChargeCatalogId) => {
+    if (!selectedService?.serviceId || !extraChargeCatalogId) return;
+
+    try {
+      const res = await fetch(`${API_URL}/api/service-extra-charge-catalog`, {
+        method: "POST",
+        headers: getAuthHeaders(true),
+        body: JSON.stringify({
+          serviceId: Number(selectedService.serviceId),
+          extraChargeCatalogId: Number(extraChargeCatalogId),
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Thêm phí phát sinh thất bại");
+      }
+
+      toast.success("Đã thêm phí phát sinh.");
+      await fetchServices();
+    } catch (err) {
+      toast.error(err.message || "Đã có lỗi xảy ra");
+    }
+  };
+
+  const handleUpdateExtraCharge = async (
+    serviceExtraChargeCatalogId,
+    extraChargeCatalogId,
+  ) => {
+    if (
+      !selectedService?.serviceId ||
+      !serviceExtraChargeCatalogId ||
+      !extraChargeCatalogId
+    ) {
+      return;
+    }
+
+    try {
+      const res = await fetch(
+        `${API_URL}/api/service-extra-charge-catalog/${serviceExtraChargeCatalogId}`,
+        {
+          method: "PUT",
+          headers: getAuthHeaders(true),
+          body: JSON.stringify({
+            serviceId: Number(selectedService.serviceId),
+            extraChargeCatalogId: Number(extraChargeCatalogId),
+          }),
+        },
+      );
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Cập nhật phí phát sinh thất bại");
+      }
+
+      toast.success("Đã cập nhật phí phát sinh.");
+      await fetchServices();
+    } catch (err) {
+      toast.error(err.message || "Đã có lỗi xảy ra");
+    }
+  };
+
+  const handleDeleteExtraCharge = async (serviceExtraChargeCatalogId) => {
+    if (!serviceExtraChargeCatalogId) return;
+
+    const confirmed = window.confirm("Bạn có chắc muốn xóa phí phát sinh này?");
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(
+        `${API_URL}/api/service-extra-charge-catalog/${serviceExtraChargeCatalogId}`,
+        {
+          method: "DELETE",
+          headers: getAuthHeaders(false),
+        },
+      );
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Xóa phí phát sinh thất bại");
+      }
+
+      toast.success("Đã xóa phí phát sinh.");
+      await fetchServices();
+    } catch (err) {
+      toast.error(err.message || "Đã có lỗi xảy ra");
+    }
+  };
+
+  const selectedServiceExtraCharges = selectedService?.serviceId
+    ? extraChargesByServiceId[Number(selectedService.serviceId)] || []
+    : [];
+
   return (
     <div className="min-h-screen bg-[#FFF8F2] font-main">
       <Sidebar onExpandChange={setSbExpanded} />
@@ -358,6 +516,10 @@ export default function OwnerService() {
                 <h1 className="text-[22px] font-bold text-[#E54B2D]">
                   Quản lý dịch vụ
                 </h1>
+                <p className="mt-1 text-sm text-gray-500">
+                  Quản lý thông tin dịch vụ và các phí phát sinh áp dụng theo
+                  từng dịch vụ.
+                </p>
               </div>
 
               <button
@@ -376,7 +538,7 @@ export default function OwnerService() {
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Tìm theo tên dịch vụ hoặc mô tả"
+                  placeholder="Tìm dịch vụ, mô tả hoặc phí phát sinh"
                   className="h-11 w-full rounded-xl border border-gray-200 bg-[#FFFDFC] pl-11 pr-4 text-sm text-gray-700 outline-none transition focus:border-[#E8712E]"
                 />
               </div>
@@ -436,6 +598,9 @@ export default function OwnerService() {
                 <ServiceCard
                   key={service.serviceId}
                   service={service}
+                  extraCharges={
+                    extraChargesByServiceId[Number(service.serviceId)] || []
+                  }
                   onClick={() => openDetail(service)}
                 />
               ))}
@@ -451,6 +616,11 @@ export default function OwnerService() {
           setForm={setForm}
           imagePreview={imagePreview}
           existingImage={existingImage}
+          extraCharges={[]}
+          extraChargeCatalogs={extraChargeCatalogs}
+          onCreateExtraCharge={handleCreateExtraCharge}
+          onUpdateExtraCharge={handleUpdateExtraCharge}
+          onDeleteExtraCharge={handleDeleteExtraCharge}
           onImageChange={handleImageChange}
           onRemoveImage={resetImageState}
           onClose={closeModals}
@@ -468,6 +638,11 @@ export default function OwnerService() {
           setForm={setForm}
           imagePreview={imagePreview}
           existingImage={existingImage}
+          extraCharges={selectedServiceExtraCharges}
+          extraChargeCatalogs={extraChargeCatalogs}
+          onCreateExtraCharge={handleCreateExtraCharge}
+          onUpdateExtraCharge={handleUpdateExtraCharge}
+          onDeleteExtraCharge={handleDeleteExtraCharge}
           onImageChange={handleImageChange}
           onRemoveImage={resetImageState}
           onClose={closeModals}
@@ -498,6 +673,11 @@ function ServiceModal({
   setForm,
   imagePreview,
   existingImage,
+  extraCharges,
+  extraChargeCatalogs,
+  onCreateExtraCharge,
+  onUpdateExtraCharge,
+  onDeleteExtraCharge,
   onImageChange,
   onRemoveImage,
   onClose,
@@ -589,6 +769,15 @@ function ServiceModal({
               className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-[#E8712E] resize-none"
             />
           </div>
+
+          <ExtraChargePanel
+            extraCharges={extraCharges}
+            extraChargeCatalogs={extraChargeCatalogs}
+            serviceId={form.serviceId}
+            onCreate={onCreateExtraCharge}
+            onUpdate={onUpdateExtraCharge}
+            onDelete={onDeleteExtraCharge}
+          />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -687,9 +876,11 @@ function ServiceModal({
   );
 }
 
-function ServiceCard({ service, onClick }) {
+function ServiceCard({ service, extraCharges, onClick }) {
   const isActive = Number(service.status) === 1;
   const imageUrl = normalizeServiceImage(service.img);
+  const visibleExtraCharges = extraCharges.slice(0, 3);
+  const hiddenExtraChargeCount = Math.max(0, extraCharges.length - 3);
 
   return (
     <button
@@ -738,8 +929,227 @@ function ServiceCard({ service, onClick }) {
         <div className="mt-3 text-[14px] text-[#8A8A8A] leading-relaxed min-h-[66px] line-clamp-3">
           {service.description || "Chưa có mô tả"}
         </div>
+
+        <div className="mt-4 border-t border-[#F2E2D7] pt-3">
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-gray-600">
+            <Tags className="h-4 w-4 text-[#E8712E]" />
+            Phí phát sinh ({extraCharges.length})
+          </div>
+
+          {extraCharges.length === 0 ? (
+            <div className="text-xs text-gray-400">Chưa gán phí phát sinh</div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {visibleExtraCharges.map((item) => (
+                <span
+                  key={item.serviceExtraChargeCatalogId}
+                  className="rounded-full bg-[#FFF3EA] px-2.5 py-1 text-xs font-semibold text-[#E8712E]"
+                >
+                  {item.extraChargeCatalogTitle}
+                </span>
+              ))}
+
+              {hiddenExtraChargeCount > 0 && (
+                <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
+                  +{hiddenExtraChargeCount}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </button>
+  );
+}
+
+function ExtraChargePanel({
+  extraCharges,
+  extraChargeCatalogs,
+  onCreate,
+  onUpdate,
+  onDelete,
+}) {
+  const [newCatalogId, setNewCatalogId] = React.useState("");
+
+  React.useEffect(() => {
+    setNewCatalogId("");
+  }, [extraCharges]);
+
+  const usedCatalogIds = React.useMemo(
+    () =>
+      new Set(extraCharges.map((item) => Number(item.extraChargeCatalogId))),
+    [extraCharges],
+  );
+
+  const availableCatalogs = React.useMemo(() => {
+    return extraChargeCatalogs.filter(
+      (item) => !usedCatalogIds.has(Number(item.extraChargeCatalogId)),
+    );
+  }, [extraChargeCatalogs, usedCatalogIds]);
+
+  const handleAdd = () => {
+    if (!newCatalogId) {
+      toast.error("Vui lòng chọn phí phát sinh cần thêm.");
+      return;
+    }
+
+    onCreate?.(newCatalogId);
+  };
+
+  return (
+    <div className="rounded-2xl border border-[#F2E2D7] bg-[#FFFDFC] p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-bold text-gray-900">
+            <Tags className="h-4 w-4 text-[#E8712E]" />
+            Phí phát sinh áp dụng
+          </div>
+        </div>
+
+        <div className="rounded-full bg-[#FFF3EA] px-3 py-1 text-xs font-bold text-[#E8712E]">
+          {extraCharges.length} phí
+        </div>
+      </div>
+
+      <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
+        <select
+          value={newCatalogId}
+          onChange={(e) => setNewCatalogId(e.target.value)}
+          className="h-10 rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-[#E8712E]"
+        >
+          <option value="">Chọn phí phát sinh để thêm</option>
+          {availableCatalogs.map((item) => (
+            <option
+              key={item.extraChargeCatalogId}
+              value={item.extraChargeCatalogId}
+            >
+              {item.title || item.extraChargeCatalogTitle}
+            </option>
+          ))}
+        </select>
+
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={!newCatalogId}
+          className="h-10 rounded-lg bg-[#E8712E] px-4 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Thêm phí
+        </button>
+      </div>
+
+      {extraCharges.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-gray-200 bg-white p-4 text-sm text-gray-400">
+          Dịch vụ này chưa có phí phát sinh.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {extraCharges.map((item) => (
+            <ExtraChargeRow
+              key={item.serviceExtraChargeCatalogId}
+              item={item}
+              catalogs={extraChargeCatalogs}
+              usedCatalogIds={usedCatalogIds}
+              onUpdate={onUpdate}
+              onDelete={onDelete}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExtraChargeRow({
+  item,
+  catalogs,
+  usedCatalogIds,
+  onUpdate,
+  onDelete,
+}) {
+  const [editing, setEditing] = React.useState(false);
+  const [catalogId, setCatalogId] = React.useState(
+    String(item.extraChargeCatalogId || ""),
+  );
+
+  React.useEffect(() => {
+    setCatalogId(String(item.extraChargeCatalogId || ""));
+    setEditing(false);
+  }, [item.extraChargeCatalogId]);
+
+  const editableCatalogs = React.useMemo(() => {
+    return catalogs.filter((catalog) => {
+      const id = Number(catalog.extraChargeCatalogId);
+      return (
+        id === Number(item.extraChargeCatalogId) || !usedCatalogIds.has(id)
+      );
+    });
+  }, [catalogs, item.extraChargeCatalogId, usedCatalogIds]);
+
+  const selectedCatalog = catalogs.find(
+    (catalog) => Number(catalog.extraChargeCatalogId) === Number(catalogId),
+  );
+
+  const handleSave = () => {
+    if (!catalogId) {
+      toast.error("Vui lòng chọn phí phát sinh.");
+      return;
+    }
+
+    onUpdate?.(item.serviceExtraChargeCatalogId, catalogId);
+  };
+
+  return (
+    <div className="rounded-xl border border-gray-100 bg-white px-3 py-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto] md:items-start">
+        <div>
+          {editing ? (
+            <select
+              value={catalogId}
+              onChange={(e) => setCatalogId(e.target.value)}
+              className="h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm outline-none focus:border-[#E8712E]"
+            >
+              {editableCatalogs.map((catalog) => (
+                <option
+                  key={catalog.extraChargeCatalogId}
+                  value={catalog.extraChargeCatalogId}
+                >
+                  {catalog.title || catalog.extraChargeCatalogTitle} -{" "}
+                  {catalog.extraChargeType || catalog.type || "Khác"}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <>
+              <div className="text-sm font-semibold text-gray-800">
+                {item.extraChargeCatalogTitle}
+              </div>
+            </>
+          )}
+
+          <div className="mt-2">
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+              {editing
+                ? selectedCatalog?.extraChargeType ||
+                  selectedCatalog?.type ||
+                  "Khác"
+                : item.extraChargeType || "Khác"}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => onDelete?.(item.serviceExtraChargeCatalogId)}
+            className="inline-flex h-9 items-center gap-1 rounded-lg bg-red-50 px-3 text-xs font-semibold text-red-600 transition hover:bg-red-100"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Xóa
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -777,11 +1187,9 @@ function generateTextLogo(name) {
   canvas.height = 100;
   const ctx = canvas.getContext("2d");
 
-  // Background color
   ctx.fillStyle = "#E8712E";
   ctx.fillRect(0, 0, 100, 100);
 
-  // Text
   ctx.fillStyle = "white";
   ctx.font = "bold 50px Arial";
   ctx.textAlign = "center";
@@ -815,4 +1223,3 @@ function getStatusBadgeClass(status) {
 function getStatusLabel(status) {
   return status === "1" ? "Đang mở" : "Ngừng cung cấp";
 }
-

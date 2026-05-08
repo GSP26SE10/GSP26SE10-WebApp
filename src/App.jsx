@@ -27,6 +27,7 @@ import OwnerTaskTemplate from "./pages/Owner/OwnerTaskTemplate";
 import OwnerExtraChargeCatalog from "./pages/Owner/OwnerExtraChargeCatalog";
 import OwnerContactRequest from "./pages/Owner/OwnerContactRequest";
 import OwnerMenuCategory from "./pages/Owner/OwnerMenuCategory";
+import OwnerTransaction from "./pages/Owner/OwnerTransaction";
 
 function AppContent() {
   return (
@@ -54,6 +55,7 @@ function AppContent() {
           <Route path="contact-request" element={<OwnerContactRequest />} />
           <Route path="menu-category" element={<OwnerMenuCategory />} />
           <Route path="extra-charge" element={<OwnerExtraChargeCatalog />} />
+          <Route path="transaction" element={<OwnerTransaction />} />
         </Route>
       </Routes>
 

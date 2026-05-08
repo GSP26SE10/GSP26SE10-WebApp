@@ -21,6 +21,7 @@ import {
   UserRound,
   ClipboardPenLine,
   MessagesSquare,
+  Receipt,
 } from "lucide-react";
 
 export default function Sidebar({ onExpandChange }) {
@@ -175,6 +176,12 @@ export default function Sidebar({ onExpandChange }) {
               expanded={expanded}
               icon={<MessagesSquare className="h-4 w-4" />}
               label="Chăm sóc khách hàng"
+            />
+            <SubItemLink
+              to="/owner/transaction"
+              expanded={expanded}
+              icon={<Receipt className="h-4 w-4" />}
+              label="Giao dịch"
             />
           </Dropdown>
 
