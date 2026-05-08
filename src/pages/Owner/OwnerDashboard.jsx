@@ -22,7 +22,39 @@ export default function OwnerDashboard() {
   const [orders, setOrders] = React.useState([]);
   const [loadingOrders, setLoadingOrders] = React.useState(true);
   const [orderError, setOrderError] = React.useState("");
+  const uniqueOrders = React.useMemo(() => {
+    const map = new Map();
 
+    orders.forEach((order) => {
+      const orderId = order?.orderId;
+      if (orderId === undefined || orderId === null) return;
+
+      const key = String(orderId);
+
+      if (!map.has(key)) {
+        map.set(key, order);
+        return;
+      }
+
+      const current = map.get(key);
+
+      const currentDetails = Array.isArray(current?.orderDetails)
+        ? current.orderDetails
+        : [];
+
+      const nextDetails = Array.isArray(order?.orderDetails)
+        ? order.orderDetails
+        : [];
+
+      map.set(key, {
+        ...current,
+        ...order,
+        orderDetails: mergeOrderDetailsById(currentDetails, nextDetails),
+      });
+    });
+
+    return Array.from(map.values());
+  }, [orders]);
   const [topSellingMenus, setTopSellingMenus] = React.useState([]);
   const [loadingMenus, setLoadingMenus] = React.useState(true);
   const [menuError, setMenuError] = React.useState("");
@@ -164,7 +196,7 @@ export default function OwnerDashboard() {
   }, [fetchMenus]);
 
   const pendingOrders = React.useMemo(() => {
-    return orders
+    return uniqueOrders
       .filter((order) => Number(order.status) === 1)
       .map((order) => {
         const detail = order.orderDetails?.[0];
@@ -181,17 +213,15 @@ export default function OwnerDashboard() {
       });
   }, [orders]);
 
-  const pendingCount = orders.filter((x) => Number(x.status) === 1).length;
-  const approvedCount = orders.filter((x) => Number(x.status) === 2).length;
-  const rejectedCount = orders.filter((x) => Number(x.status) === 3).length;
-  const processingCount = orders.filter((x) =>
-    [4, 5].includes(Number(x.status)),
+  const pendingCount = countOrdersByStatus(uniqueOrders, 1);
+  const approvedCount = countOrdersByStatus(uniqueOrders, 2);
+  const rejectedCount = countOrdersByStatus(uniqueOrders, 3);
+  const processingCount = uniqueOrders.filter((order) =>
+    [4, 5].includes(Number(order.status)),
   ).length;
-  const waitingPaymentCount = orders.filter(
-    (x) => Number(x.status) === 6,
-  ).length;
-  const paidCount = orders.filter((x) => Number(x.status) === 7).length;
-  const cancelledCount = orders.filter((x) => Number(x.status) === 8).length;
+  const waitingPaymentCount = countOrdersByStatus(uniqueOrders, 6);
+  const paidCount = countOrdersByStatus(uniqueOrders, 7);
+  const cancelledCount = countOrdersByStatus(uniqueOrders, 8);
 
   const displayRevenueData = React.useMemo(() => {
     if (!Array.isArray(revenueData)) return [];
@@ -360,6 +390,14 @@ export default function OwnerDashboard() {
             {stats.map((s) => (
               <StatCard key={s.title} {...s} />
             ))}
+          </div>
+
+          <div className="mt-3 text-xs text-gray-400">
+            Trạng thái đơn hàng đang được đếm theo orderId duy nhất
+            {orders.length !== uniqueOrders.length
+              ? ` (${orders.length} dòng chi tiết → ${uniqueOrders.length} đơn hàng)`
+              : ""}
+            .
           </div>
 
           <section className="mt-6 bg-white rounded-xl border border-[#F1F2F6] p-6">
@@ -780,6 +818,27 @@ function RevenueAreaChart({ data, viewMode }) {
       </div>
     </div>
   );
+}
+
+function countOrdersByStatus(orders, status) {
+  return orders.filter((order) => Number(order.status) === Number(status))
+    .length;
+}
+
+function mergeOrderDetailsById(currentDetails, nextDetails) {
+  const map = new Map();
+
+  [...currentDetails, ...nextDetails].forEach((detail) => {
+    const detailId =
+      detail?.orderDetailId ??
+      detail?.orderDetailsId ??
+      detail?.id ??
+      `${detail?.menuId || ""}-${detail?.startTime || ""}-${detail?.address || ""}`;
+
+    map.set(String(detailId), detail);
+  });
+
+  return Array.from(map.values());
 }
 
 function normalizeDate(value) {

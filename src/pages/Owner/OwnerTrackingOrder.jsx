@@ -1825,8 +1825,8 @@ function OrderBadge({ status }) {
       className: "bg-[#DBEAFE] text-[#1D4ED8]",
     },
     5: {
-      label: "Hoàn thành",
-      className: "bg-[#D1FAE5] text-[#047857]",
+      label: "Kết thúc tiệc",
+      className: "bg-[#FDF2F8] text-[#DB2777]",
     },
     6: {
       label: "Đang chờ thanh toán",
